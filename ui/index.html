@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microsoft Resume 2000 - [Faris Antoni.doc]</title>
+  <link rel="stylesheet" href="/office2000.css">
+</head>
+<body>
+  <div class="win-desktop">
+    <!-- 1. Window Titlebar -->
+    <header class="win-titlebar">
+      <div class="win-title-left">
+        <span class="win-icon">W</span>
+        <span class="win-title-text">Microsoft Resume 2000 - [Faris Antoni.doc]</span>
+      </div>
+      <div class="win-controls">
+        <button class="win-btn-control" title="Minimize" id="btn-minimize">_</button>
+        <button class="win-btn-control" title="Maximize" id="btn-maximize">□</button>
+        <button class="win-btn-control" title="Close" id="btn-close">×</button>
+      </div>
+    </header>
+
+    <!-- 2. Menubar -->
+    <nav class="win-menubar">
+      <div class="menu-item" id="menu-file"><u>F</u>ile</div>
+      <div class="menu-item" id="menu-edit"><u>E</u>dit</div>
+      <div class="menu-item" id="menu-view"><u>V</u>iew</div>
+      <div class="menu-item" id="menu-insert"><u>I</u>nsert</div>
+      <div class="menu-item" id="menu-format">F<u>o</u>rmat</div>
+      <div class="menu-item" id="menu-tools"><u>T</u>ools</div>
+      <div class="menu-item" id="menu-table">Ta<u>b</u>le</div>
+      <div class="menu-item" id="menu-window"><u>W</u>indow</div>
+      <div class="menu-item" id="menu-help"><u>H</u>elp</div>
+    </nav>
+
+    <!-- 3. Standard Toolbar -->
+    <div class="win-toolbar">
+      <div class="tool-handle"></div>
+      <button class="tool-btn" id="tb-new" title="New Document">
+        <span class="btn-icon">📄</span>
+      </button>
+      <button class="tool-btn" id="tb-open" title="Open Fixture">
+        <span class="btn-icon">📁</span>
+      </button>
+      <button class="tool-btn" id="tb-save" title="Save JSON">
+        <span class="btn-icon">💾</span>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" id="tb-print" title="Export PDF">
+        <span class="btn-icon">🖨️</span>
+        <span>Export PDF</span>
+      </button>
+      <button class="tool-btn" id="tb-preview" title="Refresh Live Preview">
+        <span class="btn-icon">🔍</span>
+        <span>Preview</span>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" id="tb-cut" title="Cut">✂️</button>
+      <button class="tool-btn" id="tb-copy" title="Copy">📋</button>
+      <button class="tool-btn" id="tb-undo" title="Undo">↩️</button>
+      <button class="tool-btn" id="tb-redo" title="Redo">↪️</button>
+      <div class="tool-sep"></div>
+      <label for="zoom-select" style="margin-right: 4px;">Zoom:</label>
+      <select id="zoom-select" class="tool-select">
+        <option value="0.5">50%</option>
+        <option value="0.75" selected>75%</option>
+        <option value="1.0">100%</option>
+        <option value="fit">Fit Page</option>
+      </select>
+    </div>
+
+    <!-- 4. Formatting Toolbar -->
+    <div class="win-toolbar" style="height: 26px; border-top: none;">
+      <div class="tool-handle"></div>
+      <select class="tool-select" style="width: 130px;" disabled>
+        <option>ResumeSans (Inter)</option>
+      </select>
+      <select class="tool-select" style="width: 50px;" disabled>
+        <option>10 pt</option>
+      </select>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" style="font-weight: bold;" disabled>B</button>
+      <button class="tool-btn" style="font-style: italic;" disabled>I</button>
+      <button class="tool-btn" style="text-decoration: underline;" disabled>U</button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" disabled>≡</button>
+      <button class="tool-btn" disabled>≣</button>
+      <span style="margin-left: auto; color: #555; font-size: 10px;">Strict 1-Page A4 Budget Guard Active</span>
+    </div>
+
+    <!-- 5. Main Workspace (Taskpane + Document Canvas) -->
+    <div class="win-workspace">
+      <!-- Task Pane / Controls -->
+      <aside class="taskpane">
+        <div class="taskpane-header">
+          <span>Resume Generator Task Pane</span>
+          <span style="cursor: pointer;" title="Dock">🗕</span>
+        </div>
+        <div class="taskpane-body">
+          <!-- Data Source Section -->
+          <fieldset class="win-fieldset">
+            <legend class="win-legend">1. Data Source</legend>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="source-type" value="fixture" checked id="src-fixture">
+                <span>Local Fixture (fixtures/site.html)</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="source-type" value="live" id="src-live">
+                <span>Live Web</span>
+              </label>
+            </div>
+            <div id="live-url-group" style="margin-top: 6px; display: none;">
+              <label for="input-live-url" class="form-label" style="font-size: 10px;">Site URL:</label>
+              <input type="text" id="input-live-url" class="win-input" style="width: 100%;" placeholder="https://farisantoni.com" value="https://farisantoni.com">
+            </div>
+            <div class="form-group" style="margin-top: 8px;">
+              <button class="win-button win-button-primary btn-block" id="btn-extract">
+                <span>⚡ Extract Resume DOM</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <!-- Contact Phone Override Section -->
+          <fieldset class="win-fieldset">
+            <legend class="win-legend">2. Contact Injection</legend>
+            <div class="form-group">
+              <label for="input-phone" class="form-label">Phone Override:</label>
+              <input type="text" id="input-phone" class="win-input" placeholder="+65 9123 4567" value="">
+              <span style="font-size: 10px; color: #555;">Injected into basics.contact.phone</span>
+            </div>
+          </fieldset>
+
+          <!-- Generation Actions Section -->
+          <fieldset class="win-fieldset">
+            <legend class="win-legend">3. Render & Compile</legend>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <button class="win-button btn-block" id="btn-render-preview">
+                <span>👁️ Update Sandboxed Preview</span>
+              </button>
+              <button class="win-button win-button-primary btn-block" id="btn-download-pdf">
+                <span>💾 Export 1-Page PDF</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <!-- Diagnostics & Warnings Well -->
+          <fieldset class="win-fieldset" style="flex: 1; display: flex; flex-direction: column;">
+            <legend class="win-legend">Diagnostics & Warnings</legend>
+            <div id="diagnostics-log" class="well-panel" style="flex: 1; min-height: 120px;">
+              <div class="log-item log-info">[System] Office 2000 environment initialized.</div>
+              <div class="log-item log-info">[Loopback] Connected to 127.0.0.1:3000.</div>
+              <div class="log-item log-info">[Sandbox] Isolated iframe ready.</div>
+            </div>
+          </fieldset>
+        </div>
+      </aside>
+
+      <!-- Document Canvas -->
+      <main class="document-canvas" id="canvas-area">
+        <div class="a4-container" id="a4-page">
+          <!-- Standalone sandboxed iframe without script permissions -->
+          <iframe id="preview-frame" sandbox="" class="a4-iframe" title="A4 Resume Sandboxed Live Preview"></iframe>
+          <div id="placeholder-overlay" class="preview-placeholder">
+            <div class="placeholder-icon">📄</div>
+            <div style="font-size: 13px; font-weight: bold; color: #444;">No Document Rendered</div>
+            <div style="font-size: 11px; max-width: 240px; text-align: center;">
+              Click <b>"Extract Resume DOM"</b> to fetch and parse candidate data into the sandboxed A4 template.
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 6. Status Bar -->
+    <footer class="win-statusbar">
+      <div class="status-cell status-flex" id="status-bar-text">Ready</div>
+      <div class="status-cell" id="status-page-count">Page 1/1</div>
+      <div class="status-cell">A4 Portrait</div>
+      <div class="status-cell"><span class="status-badge badge-ok" id="status-ats-badge">ATS: Ready</span></div>
+      <div class="status-cell" id="status-host">127.0.0.1:3000</div>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

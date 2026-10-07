@@ -1,0 +1,69 @@
+{
+  "basics": {
+    "name": "Faris Antoni",
+    "title": "Software Engineer & System Architect",
+    "summary": "Experienced engineer specializing in high-efficiency distributed systems, full-stack architecture, and streamlined workflows.",
+    "contact": {
+      "email": "contact@farisantoni.com",
+      "phone": "+1-555-0199",
+      "location": "Jakarta, Indonesia",
+      "github": "https://github.com/farisantoni",
+      "linkedin": "https://linkedin.com/in/farisantoni",
+      "website": "https://farisantoni.com"
+    }
+  },
+  "work": [
+    {
+      "role": "Senior Software Engineer",
+      "company": "Datanian Technologies",
+      "location": "Jakarta, Indonesia",
+      "start": "2024-03",
+      "end": null,
+      "highlights": [
+        "Architected scalable microservices delivering efficient offline workflow execution and high availability.",
+        "Engineered configuration pipelines supporting defined traffic profile requirements."
+      ]
+    },
+    {
+      "role": "Software Engineer",
+      "company": "Tech Solutions Inc.",
+      "location": "Remote",
+      "start": "2022-01",
+      "end": "2024-02",
+      "highlights": [
+        "Optimized database queries and built fault-tolerant event processing pipelines.",
+        "Refactored legacy modules into modular components, improving test efficiency."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Indonesia",
+      "degree": "B.S. in Computer Science",
+      "start": "2018",
+      "end": "2022",
+      "type": "Undergraduate"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Languages & Core",
+      "items": ["TypeScript", "JavaScript", "Python", "Go", "SQL", "HTML/CSS"]
+    },
+    {
+      "category": "Frameworks & Tools",
+      "items": ["Node.js", "Hono", "React", "Playwright", "Docker", "Git"]
+    }
+  ],
+  "certifications": [
+    "AWS Certified Solutions Architect"
+  ],
+  "projects": [
+    {
+      "title": "Resume Gen",
+      "description": "Headless CLI and vintage desktop web app for ATS-compliant resume compilation.",
+      "stack": ["TypeScript", "Hono", "Playwright", "Handlebars"],
+      "link": "https://github.com/farisantoni/resume-gen"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{basics.name}} - Resume</title>
+  {{{inlinedStyles}}}
+</head>
+<body>
+  <div class="resume-page">
+    <header class="resume-header">
+      <h1 class="candidate-name">{{basics.name}}</h1>
+      <div class="candidate-title">{{basics.title}}</div>
+      <div class="contact-bar">
+        {{#if basics.contact.email}}
+          <span class="contact-item"><a href="mailto:{{basics.contact.email}}">{{basics.contact.email}}</a></span>
+        {{/if}}
+        {{#if basics.contact.phone}}
+          <span class="contact-sep">•</span>
+          <span class="contact-item">{{basics.contact.phone}}</span>
+        {{/if}}
+        {{#if basics.contact.location}}
+          <span class="contact-sep">•</span>
+          <span class="contact-item">{{basics.contact.location}}</span>
+        {{/if}}
+        {{#if basics.contact.github}}
+          <span class="contact-sep">•</span>
+          <span class="contact-item"><a href="{{basics.contact.github}}">GitHub</a></span>
+        {{/if}}
+        {{#if basics.contact.linkedin}}
+          <span class="contact-sep">•</span>
+          <span class="contact-item"><a href="{{basics.contact.linkedin}}">LinkedIn</a></span>
+        {{/if}}
+        {{#if basics.contact.website}}
+          <span class="contact-sep">•</span>
+          <span class="contact-item"><a href="{{basics.contact.website}}">Website</a></span>
+        {{/if}}
+      </div>
+    </header>
+
+    {{#if basics.summary}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.SUMMARY}}</h2>
+      <p class="summary-text">{{basics.summary}}</p>
+    </section>
+    {{/if}}
+
+    {{#if work.length}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.EXPERIENCE}}</h2>
+      {{#each work}}
+      <div class="experience-item">
+        <div class="item-header">
+          <div class="item-title-group">
+            <span class="item-role">{{this.role}}</span>
+            <span class="contact-sep">|</span>
+            <span class="item-company">{{this.company}}</span>
+          </div>
+          <div class="item-meta">
+            {{#if this.location}}{{this.location}} • {{/if}}
+            {{this.start}} – {{#if this.end}}{{this.end}}{{else}}Present{{/if}}
+          </div>
+        </div>
+        <ul class="highlight-list">
+          {{#each this.highlights}}
+          <li>{{this}}</li>
+          {{/each}}
+        </ul>
+      </div>
+      {{/each}}
+    </section>
+    {{/if}}
+
+    {{#if education.length}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.EDUCATION}}</h2>
+      {{#each education}}
+      <div class="education-item">
+        <div class="edu-title-group">
+          <span class="edu-degree">{{this.degree}}</span>
+          <span class="contact-sep">|</span>
+          <span class="edu-institution">{{this.institution}}</span>
+        </div>
+        <div class="edu-meta">
+          {{#if this.start}}{{this.start}} – {{/if}}{{#if this.end}}{{this.end}}{{else}}Present{{/if}}
+        </div>
+      </div>
+      {{/each}}
+    </section>
+    {{/if}}
+
+    {{#if skills.length}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.SKILLS}}</h2>
+      {{#each skills}}
+      <div class="skill-category-row">
+        <span class="skill-cat-name">{{this.category}}:</span>
+        <span class="skill-cat-items">
+          {{#each this.items}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+        </span>
+      </div>
+      {{/each}}
+    </section>
+    {{/if}}
+
+    {{#if certifications.length}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.CERTIFICATIONS}}</h2>
+      <div class="certs-inline">
+        {{#each certifications}}{{this}}{{#unless @last}} • {{/unless}}{{/each}}
+      </div>
+    </section>
+    {{/if}}
+
+    {{#if projects.length}}
+    <section class="section">
+      <h2 class="section-heading">{{headings.PROJECTS}}</h2>
+      {{#each projects}}
+      <div class="project-item">
+        <span class="project-title">{{this.title}}</span>
+        {{#if this.stack.length}}
+          <span class="contact-sep">|</span>
+          <span class="edu-meta">{{#each this.stack}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</span>
+        {{/if}}
+        <p class="project-desc">{{this.description}}</p>
+      </div>
+      {{/each}}
+    </section>
+    {{/if}}
+  </div>
+</body>
+</html>

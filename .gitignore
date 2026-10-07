@@ -1,0 +1,24 @@
+# --- Dependencies & Build ---
+node_modules/
+dist/
+out/
+build/
+*.pdf
+
+# --- TypeScript & Cache ---
+*.tsbuildinfo
+
+# --- Test Artifacts & Logs ---
+test-results/
+playwright-report/
+*.log
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Agent & Tooling ---
+.agent
+.agent/
+.agents
+.agents/
