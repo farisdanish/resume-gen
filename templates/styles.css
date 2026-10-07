@@ -18,6 +18,13 @@ html, body {
   color: #1a202c;
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  display: none;
 }
 
 .resume-page {

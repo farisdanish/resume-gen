@@ -9,8 +9,16 @@ describe('Server & Loopback Security Test', () => {
   const BASE_URL = `http://127.0.0.1:${PORT}`;
 
   beforeAll(async () => {
+    try {
+      const check = await fetch(`${BASE_URL}/api/health`);
+      if (check.ok) {
+        // Server already running (e.g. active dev server)
+        return;
+      }
+    } catch {
+      // Server not running yet
+    }
     serverInstance = startServer(PORT, '127.0.0.1');
-    // Allow server socket to bind
     await new Promise((resolve) => setTimeout(resolve, 300));
   });
 

@@ -45,16 +45,61 @@
     statusPageCount.textContent = pageInfo;
   }
 
+  let currentZoom = 0.75;
+
+  function setZoom(scale, isPreset = false) {
+    currentZoom = Math.min(Math.max(scale, 0.25), 2.5);
+    a4Page.style.transform = `scale(${currentZoom.toFixed(2)})`;
+
+    const percentText = `${Math.round(currentZoom * 100)}%`;
+    let matchingOption = Array.from(zoomSelect.options).find(
+      (opt) => opt.value !== 'fit' && Math.abs(parseFloat(opt.value) - currentZoom) < 0.02
+    );
+
+    if (matchingOption) {
+      zoomSelect.value = matchingOption.value;
+    } else if (!isPreset) {
+      let customOption = document.getElementById('zoom-custom-option');
+      if (!customOption) {
+        customOption = document.createElement('option');
+        customOption.id = 'zoom-custom-option';
+        zoomSelect.appendChild(customOption);
+      }
+      customOption.value = currentZoom.toFixed(2);
+      customOption.textContent = percentText;
+      zoomSelect.value = customOption.value;
+    }
+  }
+
   function applyZoom() {
     const val = zoomSelect.value;
     if (val === 'fit') {
       const availableHeight = canvasArea.clientHeight - 60;
-      const scale = Math.min(Math.max(availableHeight / 1123, 0.4), 1.0);
+      const scale = Math.min(Math.max(availableHeight / 1123, 0.35), 1.0);
+      currentZoom = scale;
       a4Page.style.transform = `scale(${scale.toFixed(2)})`;
     } else {
-      a4Page.style.transform = `scale(${val})`;
+      setZoom(parseFloat(val), true);
     }
   }
+
+  // MS Word Ctrl + Mouse Wheel Zoom Simulation
+  function handleWheelZoom(e) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      // Scrolling up zooms in, scrolling down zooms out
+      const step = e.deltaY < 0 ? 0.05 : -0.05;
+      setZoom(currentZoom + step);
+    }
+  }
+
+  canvasArea.addEventListener('wheel', handleWheelZoom, { passive: false });
+  window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      handleWheelZoom(e);
+    }
+  }, { passive: false });
 
   zoomSelect.addEventListener('change', applyZoom);
   window.addEventListener('resize', () => {

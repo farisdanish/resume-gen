@@ -437,6 +437,8 @@ html, body {
   border: none;
   background-color: #ffffff;
   display: block;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Watermark / Empty Preview Placeholder */

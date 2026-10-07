@@ -62,10 +62,13 @@
       <button class="tool-btn" id="tb-redo" title="Redo">↪️</button>
       <div class="tool-sep"></div>
       <label for="zoom-select" style="margin-right: 4px;">Zoom:</label>
-      <select id="zoom-select" class="tool-select">
+      <select id="zoom-select" class="tool-select" title="Zoom Level (or Ctrl + Mouse Wheel)">
         <option value="0.5">50%</option>
         <option value="0.75" selected>75%</option>
         <option value="1.0">100%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+        <option value="2.0">200%</option>
         <option value="fit">Fit Page</option>
       </select>
     </div>
@@ -161,7 +164,7 @@
       <main class="document-canvas" id="canvas-area">
         <div class="a4-container" id="a4-page">
           <!-- Standalone sandboxed iframe without script permissions -->
-          <iframe id="preview-frame" sandbox="" class="a4-iframe" title="A4 Resume Sandboxed Live Preview"></iframe>
+          <iframe id="preview-frame" sandbox="" class="a4-iframe" scrolling="no" title="A4 Resume Sandboxed Live Preview"></iframe>
           <div id="placeholder-overlay" class="preview-placeholder">
             <div class="placeholder-icon">📄</div>
             <div style="font-size: 13px; font-weight: bold; color: #444;">No Document Rendered</div>
