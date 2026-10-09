@@ -79,6 +79,37 @@ describe('Server & Loopback Security Test', () => {
     expect(previewBody.html).toContain('@font-face');
   });
 
+  test('POST /api/preview: Respects custom styleConfig and headings', async () => {
+    const extractRes = await fetch(`${BASE_URL}/api/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'fixture' }),
+    });
+    const { data } = await extractRes.json();
+
+    const previewRes = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume: data,
+        styleConfig: {
+          accentColor: '#1b4332',
+          fontPairing: 'modern',
+          density: 'compact',
+        },
+        headings: {
+          EXPERIENCE: 'WORK HISTORY',
+        },
+      }),
+    });
+
+    expect(previewRes.status).toBe(200);
+    const previewBody = await previewRes.json();
+    expect(previewBody.success).toBe(true);
+    expect(previewBody.html).toContain('--primary-accent: #1b4332');
+    expect(previewBody.html).toContain('WORK HISTORY');
+  });
+
   test('POST /api/generate-pdf: Returns binary PDF with single page budget header', async () => {
     const extractRes = await fetch(`${BASE_URL}/api/extract`, {
       method: 'POST',

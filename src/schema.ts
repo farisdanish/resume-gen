@@ -77,3 +77,34 @@ export const ResumeSchema = z.object({
 });
 
 export type Resume = z.infer<typeof ResumeSchema>;
+
+export const StyleConfigSchema = z
+  .object({
+    fontPairing: z.enum(['modern', 'editorial', 'serif']).default('editorial'),
+    accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#2b6cb0'),
+    density: z.enum(['compact', 'standard', 'spacious']).default('standard'),
+    margins: z.enum(['tight', 'standard', 'spacious']).default('standard'),
+  })
+  .default({
+    fontPairing: 'editorial',
+    accentColor: '#2b6cb0',
+    density: 'standard',
+    margins: 'standard',
+  });
+
+export type StyleConfig = z.infer<typeof StyleConfigSchema>;
+
+export const SectionHeadingsSchema = z
+  .object({
+    SUMMARY: z.string().default('SUMMARY'),
+    EXPERIENCE: z.string().default('EXPERIENCE'),
+    EDUCATION: z.string().default('EDUCATION'),
+    SKILLS: z.string().default('SKILLS'),
+    CERTIFICATIONS: z.string().default('CERTIFICATIONS'),
+    PROJECTS: z.string().default('PROJECTS'),
+  })
+  .partial()
+  .default({});
+
+export type SectionHeadings = z.infer<typeof SectionHeadingsSchema>;
+

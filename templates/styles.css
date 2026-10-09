@@ -9,12 +9,24 @@
   padding: 0;
 }
 
+:root {
+  --primary-accent: #2b6cb0;
+  --font-heading: 'ResumeSerif', Georgia, serif;
+  --font-body: 'ResumeSans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-base-size: 8.5pt;
+  --line-height-base: 1.35;
+  --font-heading-size: 10.5pt;
+  --font-name-size: 20pt;
+  --page-padding-y: 12mm;
+  --page-padding-x: 14mm;
+}
+
 html, body {
   width: 210mm;
   min-height: 297mm;
-  font-family: 'ResumeSans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 8.5pt;
-  line-height: 1.35;
+  font-family: var(--font-body);
+  font-size: var(--font-base-size);
+  line-height: var(--line-height-base);
   color: #1a202c;
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
@@ -28,7 +40,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .resume-page {
-  padding: 12mm 14mm;
+  padding: var(--page-padding-y) var(--page-padding-x);
   width: 100%;
 }
 
@@ -40,8 +52,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .candidate-name {
-  font-family: 'ResumeSerif', Georgia, serif;
-  font-size: 20pt;
+  font-family: var(--font-heading);
+  font-size: var(--font-name-size);
   font-weight: 700;
   letter-spacing: -0.3pt;
   color: #1a202c;
@@ -79,12 +91,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .section-heading {
-  font-family: 'ResumeSerif', Georgia, serif;
-  font-size: 10.5pt;
+  font-family: var(--font-heading);
+  font-size: var(--font-heading-size);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5pt;
-  color: #2b6cb0;
+  color: var(--primary-accent);
   border-bottom: 0.75pt solid #e2e8f0;
   padding-bottom: 1.5pt;
   margin-bottom: 4pt;

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { runExtraction } from './extract';
-import { ResumeSchema } from './schema';
+import { ResumeSchema, StyleConfigSchema, SectionHeadingsSchema } from './schema';
 import { renderResume } from './render';
 import { generatePdf } from './pdf';
 
@@ -73,7 +73,12 @@ app.post('/api/preview', async (c) => {
       );
     }
 
-    const html = renderResume(validation.data);
+    const styleValidation = StyleConfigSchema.safeParse(body.styleConfig);
+    const styleConfig = styleValidation.success ? styleValidation.data : undefined;
+    const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
+    const headings = headingsValidation.success ? headingsValidation.data : undefined;
+
+    const html = renderResume(validation.data, { styleConfig, headings });
     return c.json({
       success: true,
       html,
@@ -102,7 +107,13 @@ app.post('/api/generate-pdf', async (c) => {
           400
         );
       }
-      html = renderResume(validation.data);
+
+      const styleValidation = StyleConfigSchema.safeParse(body.styleConfig);
+      const styleConfig = styleValidation.success ? styleValidation.data : undefined;
+      const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
+      const headings = headingsValidation.success ? headingsValidation.data : undefined;
+
+      html = renderResume(validation.data, { styleConfig, headings });
     }
 
     const { buffer, pageCount, isSinglePage } = await generatePdf({ html });
