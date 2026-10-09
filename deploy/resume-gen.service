@@ -1,0 +1,25 @@
+[Unit]
+Description=Resume-Gen Office 2000 Resume Studio & PDF Generator
+After=network.target
+
+[Service]
+Type=simple
+User=farisantoni
+WorkingDirectory=/home/farisantoni/projects/personal/resume-gen
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+ExecStart=/usr/bin/npm run dev
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=resume-gen
+
+# Security Hardening
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/farisantoni/projects/personal/resume-gen/out /tmp
+
+[Install]
+WantedBy=multi-user.target
