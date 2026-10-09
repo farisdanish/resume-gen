@@ -44,10 +44,11 @@ else
 fi
 
 # 6. Verify health check
-echo "--> 6. Verifying loopback health endpoint (127.0.0.1:3000/api/health)..."
+CHECK_PORT="${PORT:-3005}"
+echo "--> 6. Verifying loopback health endpoint (127.0.0.1:${CHECK_PORT}/api/health)..."
 if command -v curl >/dev/null 2>&1; then
-    if curl -fsSL http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
-        echo "    ✓ Health check PASSED: Server is alive on 127.0.0.1:3000"
+    if curl -fsSL "http://127.0.0.1:${CHECK_PORT}/api/health" >/dev/null 2>&1; then
+        echo "    ✓ Health check PASSED: Server is alive on 127.0.0.1:${CHECK_PORT}"
     else
         echo "    ! Notice: Health check not yet responding (server may be managed independently or starting up)."
     fi
