@@ -17,10 +17,5 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=resume-gen
 
-# Security Hardening
-ProtectSystem=full
-ProtectHome=true
-ReadWritePaths=/opt/resume-gen/app/out /tmp
-
 [Install]
 WantedBy=multi-user.target
