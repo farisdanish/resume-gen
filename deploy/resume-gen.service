@@ -4,8 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=farisantoni
-WorkingDirectory=/home/farisantoni/projects/personal/resume-gen
+User=resume-gen
+Group=resume-gen
+WorkingDirectory=/opt/resume-gen/app
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=HOST=127.0.0.1
@@ -18,8 +19,8 @@ SyslogIdentifier=resume-gen
 
 # Security Hardening
 ProtectSystem=full
-ProtectHome=read-only
-ReadWritePaths=/home/farisantoni/projects/personal/resume-gen/out /tmp
+ProtectHome=true
+ReadWritePaths=/opt/resume-gen/app/out /tmp
 
 [Install]
 WantedBy=multi-user.target
