@@ -249,13 +249,13 @@ html, body {
 
 /* Left Sidebar / Task Pane */
 .taskpane {
-  width: 310px;
-  min-width: 310px;
+  width: 340px;
+  min-width: 340px;
   background-color: var(--win-gray);
   border-right: 2px solid var(--win-dark-gray);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: inset 1px 1px #fff;
 }
 
@@ -270,14 +270,225 @@ html, body {
   justify-content: space-between;
   padding: 0 8px;
   border-bottom: 1px solid var(--win-dark-gray);
+  flex-shrink: 0;
+}
+
+/* Office 2000 Property Sheet Tabs */
+.taskpane-tabs {
+  display: flex;
+  background-color: var(--win-gray);
+  padding: 4px 6px 0 6px;
+  gap: 2px;
+  border-bottom: 1px solid var(--win-dark-gray);
+  box-shadow: inset 0 1px 0 #ffffff;
+  flex-shrink: 0;
+}
+
+.taskpane-tab-btn {
+  background-color: var(--win-gray);
+  border-top: 1px solid var(--win-white);
+  border-left: 1px solid var(--win-white);
+  border-right: 1px solid var(--win-dark-gray);
+  border-bottom: 1px solid var(--win-dark-gray);
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+  padding: 3px 8px;
+  font-family: var(--win-font);
+  font-size: 11px;
+  cursor: pointer;
+  color: #000;
+  outline: none;
+  position: relative;
+  top: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.taskpane-tab-btn:hover {
+  background-color: #dfdeda;
+}
+
+.taskpane-tab-btn.active {
+  font-weight: bold;
+  background-color: var(--win-gray);
+  border-bottom: 1px solid var(--win-gray);
+  padding-bottom: 4px;
+  z-index: 2;
+  box-shadow: 0 -1px 0 #ffffff;
 }
 
 .taskpane-body {
-  padding: 10px;
+  flex: 1;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  overflow-y: auto;
+  gap: 8px;
 }
+
+.tab-pane {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tab-pane.active {
+  display: flex;
+}
+
+/* Content Editor Controls */
+.win-textarea {
+  width: 100%;
+  padding: 3px 5px;
+  font-family: var(--win-font);
+  font-size: 11px;
+  background: #ffffff;
+  color: #000;
+  border-top: 1px solid var(--win-dark-gray);
+  border-left: 1px solid var(--win-dark-gray);
+  border-right: 1px solid var(--win-white);
+  border-bottom: 1px solid var(--win-white);
+  box-shadow: inset 1px 1px 0 var(--win-black);
+  outline: none;
+  resize: vertical;
+}
+
+.win-textarea:focus {
+  background-color: #ffffee;
+}
+
+.win-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.char-counter {
+  font-size: 10px;
+  color: #555;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.editor-card {
+  border: 1px solid var(--win-dark-gray);
+  box-shadow: 1px 1px 0 #ffffff;
+  background: #f4f2ec;
+  margin-bottom: 6px;
+}
+
+.editor-card-header {
+  background: #dfdeda;
+  padding: 4px 6px;
+  font-weight: bold;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--win-dark-gray);
+}
+
+.editor-card-body {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bullet-item {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.bullet-item .win-textarea {
+  flex: 1;
+  min-height: 32px;
+  font-size: 10.5px;
+}
+
+.btn-icon-only {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: bold;
+}
+
+.btn-danger {
+  color: #b00000;
+}
+
+.win-button-sm {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 4px;
+  background: #ffffff;
+  border-top: 1px solid var(--win-dark-gray);
+  border-left: 1px solid var(--win-dark-gray);
+  border-right: 1px solid var(--win-white);
+  border-bottom: 1px solid var(--win-white);
+  box-shadow: inset 1px 1px 0 var(--win-black);
+  min-height: 26px;
+}
+
+.tag-pill {
+  background: #d8e2f3;
+  border: 1px solid #7f9db9;
+  padding: 1px 5px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+}
+
+.tag-del-btn {
+  cursor: pointer;
+  font-weight: bold;
+  color: #666;
+}
+
+.tag-del-btn:hover {
+  color: #a00;
+}
+
+.color-swatches {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.color-swatch-btn {
+  width: 22px;
+  height: 20px;
+  border: 1px solid #000;
+  box-shadow: 1px 1px 0 #ffffff;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0;
+}
+
+.color-swatch-btn.active {
+  outline: 2px solid #0a246a;
+  outline-offset: 1px;
+}
+
 
 /* Fieldsets and Panels */
 .win-fieldset {

@@ -100,63 +100,284 @@
           <span>Resume Generator Task Pane</span>
           <span style="cursor: pointer;" title="Dock">🗕</span>
         </div>
+
+        <!-- Task Pane Tabs -->
+        <div class="taskpane-tabs" id="taskpane-tabs">
+          <button class="taskpane-tab-btn active" data-tab="tab-source">
+            <span>🌐</span><span>Source</span>
+          </button>
+          <button class="taskpane-tab-btn" data-tab="tab-content">
+            <span>📝</span><span>Content</span>
+          </button>
+          <button class="taskpane-tab-btn" data-tab="tab-design">
+            <span>🎨</span><span>Design</span>
+          </button>
+          <button class="taskpane-tab-btn" data-tab="tab-sections">
+            <span>📑</span><span>Sections</span>
+          </button>
+        </div>
+
         <div class="taskpane-body">
-          <!-- Data Source Section -->
-          <fieldset class="win-fieldset">
-            <legend class="win-legend">1. Data Source</legend>
-            <div class="radio-group">
-              <label class="radio-label">
-                <input type="radio" name="source-type" value="fixture" checked id="src-fixture">
-                <span>Local Fixture (fixtures/site.html)</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="source-type" value="live" id="src-live">
-                <span>Live Web</span>
-              </label>
-            </div>
-            <div id="live-url-group" style="margin-top: 6px; display: none;">
-              <label for="input-live-url" class="form-label" style="font-size: 10px;">Site URL:</label>
-              <input type="text" id="input-live-url" class="win-input" style="width: 100%;" placeholder="https://farisantoni.com" value="https://farisantoni.com">
-            </div>
-            <div class="form-group" style="margin-top: 8px;">
-              <button class="win-button win-button-primary btn-block" id="btn-extract">
-                <span>⚡ Extract Resume DOM</span>
-              </button>
-            </div>
-          </fieldset>
+          <!-- 1. DATA SOURCE TAB -->
+          <div id="tab-source" class="tab-pane active">
+            <!-- Data Source Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">1. Extraction Source</legend>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="source-type" value="fixture" checked id="src-fixture">
+                  <span>Local Fixture (fixtures/site.html)</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="source-type" value="live" id="src-live">
+                  <span>Live Web</span>
+                </label>
+              </div>
+              <div id="live-url-group" style="margin-top: 6px; display: none;">
+                <label for="input-live-url" class="form-label" style="font-size: 10px;">Site URL:</label>
+                <input type="text" id="input-live-url" class="win-input" style="width: 100%;" placeholder="https://farisantoni.com" value="https://farisantoni.com">
+              </div>
+              <div class="form-group" style="margin-top: 8px;">
+                <button class="win-button win-button-primary btn-block" id="btn-extract">
+                  <span>⚡ Extract Resume DOM</span>
+                </button>
+              </div>
+            </fieldset>
 
-          <!-- Contact Phone Override Section -->
-          <fieldset class="win-fieldset">
-            <legend class="win-legend">2. Contact Injection</legend>
-            <div class="form-group">
-              <label for="input-phone" class="form-label">Phone Override:</label>
-              <input type="text" id="input-phone" class="win-input" placeholder="+65 9123 4567" value="">
-              <span style="font-size: 10px; color: #555;">Injected into basics.contact.phone</span>
-            </div>
-          </fieldset>
+            <!-- Profile & Draft Storage Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">2. Profile & Draft</legend>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button class="win-button btn-block" id="btn-reset-draft" title="Revert all edits back to pristine extracted data">
+                  <span>↺ Reset to Extracted Data</span>
+                </button>
+                <div style="display: flex; gap: 4px;">
+                  <button class="win-button btn-block" id="btn-export-json" title="Download JSON resume file">
+                    <span>💾 Save JSON</span>
+                  </button>
+                  <button class="win-button btn-block" id="btn-import-json-trigger" title="Load JSON resume file">
+                    <span>📂 Load JSON</span>
+                  </button>
+                  <input type="file" id="input-import-json" accept=".json" style="display: none;">
+                </div>
+              </div>
+            </fieldset>
 
-          <!-- Generation Actions Section -->
-          <fieldset class="win-fieldset">
-            <legend class="win-legend">3. Render & Compile</legend>
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-              <button class="win-button btn-block" id="btn-render-preview">
-                <span>👁️ Update Sandboxed Preview</span>
-              </button>
-              <button class="win-button win-button-primary btn-block" id="btn-download-pdf">
-                <span>💾 Export 1-Page PDF</span>
-              </button>
-            </div>
-          </fieldset>
+            <!-- Actions Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">3. Export Actions</legend>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button class="win-button btn-block" id="btn-render-preview">
+                  <span>👁️ Refresh Live Preview</span>
+                </button>
+                <button class="win-button win-button-primary btn-block" id="btn-download-pdf">
+                  <span>💾 Export 1-Page PDF</span>
+                </button>
+              </div>
+            </fieldset>
 
-          <!-- Diagnostics & Warnings Well -->
-          <fieldset class="win-fieldset" style="flex: 1; display: flex; flex-direction: column;">
-            <legend class="win-legend">Diagnostics & Warnings</legend>
-            <div id="diagnostics-log" class="well-panel" style="flex: 1; min-height: 120px;">
-              <div class="log-item log-info">[System] Office 2000 environment initialized.</div>
-              <div class="log-item log-info">[Loopback] Connected to 127.0.0.1:3000.</div>
-              <div class="log-item log-info">[Sandbox] Isolated iframe ready.</div>
-            </div>
-          </fieldset>
+            <!-- Diagnostics & Warnings Well -->
+            <fieldset class="win-fieldset" style="flex: 1; display: flex; flex-direction: column;">
+              <legend class="win-legend">Diagnostics & Warnings</legend>
+              <div id="diagnostics-log" class="well-panel" style="flex: 1; min-height: 100px; max-height: 140px;">
+                <div class="log-item log-info">[System] Office 2000 environment initialized.</div>
+                <div class="log-item log-info">[Loopback] Connected to 127.0.0.1:3000.</div>
+                <div class="log-item log-info">[Sandbox] Isolated iframe ready.</div>
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- 2. CONTENT EDITOR TAB -->
+          <div id="tab-content" class="tab-pane">
+            <!-- Candidate Basics Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Candidate Basics</legend>
+              <div class="form-group">
+                <label for="edit-name" class="form-label">Full Name:</label>
+                <input type="text" id="edit-name" class="win-input" placeholder="Full Name">
+              </div>
+              <div class="form-group">
+                <label for="edit-title" class="form-label">Professional Title:</label>
+                <input type="text" id="edit-title" class="win-input" placeholder="e.g. Lead Software Engineer">
+              </div>
+              <div class="form-group">
+                <label for="edit-summary" class="form-label">Executive Summary:</label>
+                <textarea id="edit-summary" class="win-textarea" rows="3" placeholder="Candidate summary statement..."></textarea>
+                <div class="char-counter" id="char-counter-summary">0 characters</div>
+              </div>
+            </fieldset>
+
+            <!-- Contact Information Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Contact Channels</legend>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-phone" checked>
+                  <span class="form-label">Phone:</span>
+                </label>
+                <input type="text" id="input-phone" class="win-input" placeholder="+65 9123 4567">
+              </div>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-email" checked>
+                  <span class="form-label">Email:</span>
+                </label>
+                <input type="text" id="input-email" class="win-input" placeholder="name@domain.com">
+              </div>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-location" checked>
+                  <span class="form-label">Location:</span>
+                </label>
+                <input type="text" id="input-location" class="win-input" placeholder="Singapore">
+              </div>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-github" checked>
+                  <span class="form-label">GitHub URL:</span>
+                </label>
+                <input type="text" id="input-github" class="win-input" placeholder="https://github.com/...">
+              </div>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-linkedin" checked>
+                  <span class="form-label">LinkedIn URL:</span>
+                </label>
+                <input type="text" id="input-linkedin" class="win-input" placeholder="https://linkedin.com/in/...">
+              </div>
+              <div class="form-group">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-contact-website" checked>
+                  <span class="form-label">Website URL:</span>
+                </label>
+                <input type="text" id="input-website" class="win-input" placeholder="https://farisantoni.com">
+              </div>
+            </fieldset>
+
+            <!-- Work Experience Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Work Experience</legend>
+              <div style="font-size: 10px; color: #555; margin-bottom: 6px;">
+                Toggle inclusion or edit highlights to fit the 1-page budget:
+              </div>
+              <div id="work-items-container">
+                <!-- Dynamically populated work items -->
+              </div>
+            </fieldset>
+
+            <!-- Skills Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Technical Skills</legend>
+              <div id="skills-items-container">
+                <!-- Dynamically populated skills categories -->
+              </div>
+            </fieldset>
+
+            <!-- Projects & Education Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Education & Projects</legend>
+              <div id="edu-items-container">
+                <!-- Dynamically populated education items -->
+              </div>
+              <div id="proj-items-container" style="margin-top: 8px;">
+                <!-- Dynamically populated project items -->
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- 3. DESIGN & THEME TAB -->
+          <div id="tab-design" class="tab-pane">
+            <!-- Typography Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Typography Pairing</legend>
+              <div class="form-group">
+                <label for="select-font-pairing" class="form-label">Font Combination:</label>
+                <select id="select-font-pairing" class="win-input" style="width: 100%;">
+                  <option value="editorial" selected>Editorial Classic (Source Serif + Inter)</option>
+                  <option value="modern">Modern Hybrid (Inter Sans + Inter Sans)</option>
+                  <option value="serif">Executive Serif (Source Serif throughout)</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-top: 8px;">
+                <label for="select-density" class="form-label">Vertical Density / Font Scaling:</label>
+                <select id="select-density" class="win-input" style="width: 100%;">
+                  <option value="compact">Compact (8.0pt, 1.25 line height) — High Density</option>
+                  <option value="standard" selected>Standard (8.5pt, 1.35 line height) — Balanced</option>
+                  <option value="spacious">Spacious (9.0pt, 1.45 line height) — Relaxed</option>
+                </select>
+              </div>
+            </fieldset>
+
+            <!-- Color Palette Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Theme & Accent Color</legend>
+              <div class="form-group">
+                <label class="form-label">Color Presets:</label>
+                <div class="color-swatches" id="color-swatches">
+                  <button type="button" class="color-swatch-btn active" data-color="#2b6cb0" style="background: #2b6cb0;" title="Steel Blue (#2b6cb0)"></button>
+                  <button type="button" class="color-swatch-btn" data-color="#0a246a" style="background: #0a246a;" title="Office Navy (#0a246a)"></button>
+                  <button type="button" class="color-swatch-btn" data-color="#2c3e50" style="background: #2c3e50;" title="Executive Slate (#2c3e50)"></button>
+                  <button type="button" class="color-swatch-btn" data-color="#1b4332" style="background: #1b4332;" title="Forest Emerald (#1b4332)"></button>
+                  <button type="button" class="color-swatch-btn" data-color="#5c1d24" style="background: #5c1d24;" title="Burgundy (#5c1d24)"></button>
+                  <button type="button" class="color-swatch-btn" data-color="#111111" style="background: #111111;" title="Monochrome Black (#111111)"></button>
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 8px;">
+                <label for="input-custom-color" class="form-label">Custom Accent Hex:</label>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                  <input type="color" id="input-custom-color" value="#2b6cb0" style="width: 28px; height: 22px; padding: 0; cursor: pointer; border: 1px solid #808080;">
+                  <input type="text" id="input-color-hex" class="win-input" value="#2b6cb0" style="flex: 1;">
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Margins Section -->
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Page Margin Density</legend>
+              <div class="form-group">
+                <label for="select-margins" class="form-label">A4 Page Margins:</label>
+                <select id="select-margins" class="win-input" style="width: 100%;">
+                  <option value="tight">Tight (10mm top/bottom, 12mm sides)</option>
+                  <option value="standard" selected>Standard (12mm top/bottom, 14mm sides)</option>
+                  <option value="spacious">Spacious (14mm top/bottom, 16mm sides)</option>
+                </select>
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- 4. SECTION ORDER TAB -->
+          <div id="tab-sections" class="tab-pane">
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Section Structure</legend>
+              <div style="font-size: 10px; color: #555; margin-bottom: 8px;">
+                Custom heading titles for ATS and section visibility:
+              </div>
+              <div class="form-group">
+                <label for="heading-summary" class="form-label">Summary Heading:</label>
+                <input type="text" id="heading-summary" class="win-input" value="SUMMARY">
+              </div>
+              <div class="form-group">
+                <label for="heading-experience" class="form-label">Experience Heading:</label>
+                <input type="text" id="heading-experience" class="win-input" value="EXPERIENCE">
+              </div>
+              <div class="form-group">
+                <label for="heading-education" class="form-label">Education Heading:</label>
+                <input type="text" id="heading-education" class="win-input" value="EDUCATION">
+              </div>
+              <div class="form-group">
+                <label for="heading-skills" class="form-label">Skills Heading:</label>
+                <input type="text" id="heading-skills" class="win-input" value="SKILLS">
+              </div>
+              <div class="form-group">
+                <label for="heading-certifications" class="form-label">Certifications Heading:</label>
+                <input type="text" id="heading-certifications" class="win-input" value="CERTIFICATIONS">
+              </div>
+              <div class="form-group">
+                <label for="heading-projects" class="form-label">Projects Heading:</label>
+                <input type="text" id="heading-projects" class="win-input" value="PROJECTS">
+              </div>
+            </fieldset>
+          </div>
         </div>
       </aside>
 
