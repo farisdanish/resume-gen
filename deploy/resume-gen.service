@@ -8,7 +8,7 @@ User=resume-gen
 Group=resume-gen
 WorkingDirectory=/opt/resume-gen/app
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=3005
 Environment=HOST=127.0.0.1
 ExecStart=/usr/bin/npm run dev
 Restart=always

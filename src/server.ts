@@ -142,7 +142,10 @@ app.get('/', (c) => {
   return c.text('Office 2000 UI index not found', 404);
 });
 
-export function startServer(port = 3000, hostname = '127.0.0.1') {
+export function startServer(
+  port = Number(process.env.PORT) || 3000,
+  hostname = process.env.HOST || '127.0.0.1'
+) {
   return serve(
     {
       fetch: app.fetch,

@@ -975,6 +975,10 @@
   tbSave?.addEventListener('click', exportJson);
 
   // Initial startup
+  const statusHost = document.getElementById('status-host');
+  if (statusHost && window.location.host) {
+    statusHost.textContent = window.location.host;
+  }
   applyZoom();
   extractData();
 })();
