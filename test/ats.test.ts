@@ -43,4 +43,35 @@ describe('ATS Validation Test', () => {
       expect(normalized).toContain(word);
     }
   }, 30000);
+
+  test('ATS: Preserves custom headings and requested section order', async () => {
+    const headings = {
+      SUMMARY: 'CAREER PROFILE',
+      SKILLS: 'CORE COMPETENCIES',
+      PROJECTS: 'SELECTED PROJECTS',
+      EDUCATION: 'ACADEMIC BACKGROUND',
+      EXPERIENCE: 'PROFESSIONAL EXPERIENCE',
+      CERTIFICATIONS: 'CREDENTIALS',
+    };
+    const order = ['summary', 'skills', 'projects', 'education', 'experience', 'certifications'] as const;
+    const html = renderResume(resumeFixture, { headings, sectionOrder: [...order] });
+    const { buffer, pageCount } = await generatePdf({ html });
+    expect(pageCount).toBe(1);
+
+    const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+    const upperText = text.toUpperCase();
+    const positions = order.map((key) => upperText.indexOf({
+      summary: headings.SUMMARY,
+      skills: headings.SKILLS,
+      projects: headings.PROJECTS,
+      education: headings.EDUCATION,
+      experience: headings.EXPERIENCE,
+      certifications: headings.CERTIFICATIONS,
+    }[key]));
+
+    positions.forEach((position) => expect(position).toBeGreaterThan(-1));
+    for (let index = 1; index < positions.length; index += 1) {
+      expect(positions[index]).toBeGreaterThan(positions[index - 1]);
+    }
+  }, 30000);
 });

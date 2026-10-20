@@ -100,6 +100,7 @@ describe('Server & Loopback Security Test', () => {
         headings: {
           EXPERIENCE: 'WORK HISTORY',
         },
+        sectionOrder: ['summary', 'skills', 'projects', 'education', 'experience', 'certifications'],
       }),
     });
 
@@ -108,6 +109,29 @@ describe('Server & Loopback Security Test', () => {
     expect(previewBody.success).toBe(true);
     expect(previewBody.html).toContain('--primary-accent: #1b4332');
     expect(previewBody.html).toContain('WORK HISTORY');
+    expect(previewBody.html.indexOf('Technical Skills')).toBeLessThan(previewBody.html.indexOf('WORK HISTORY'));
+  });
+
+  test('POST /api/preview: Rejects duplicate or incomplete section order', async () => {
+    const extractRes = await fetch(`${BASE_URL}/api/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'fixture' }),
+    });
+    const { data } = await extractRes.json();
+    const previewRes = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume: data,
+        sectionOrder: ['summary', 'summary', 'education'],
+      }),
+    });
+
+    expect(previewRes.status).toBe(400);
+    const body = await previewRes.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Invalid section order');
   });
 
   test('POST /api/generate-pdf: Returns binary PDF with single page budget header', async () => {

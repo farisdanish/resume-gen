@@ -489,6 +489,99 @@ html, body {
   outline-offset: 1px;
 }
 
+.section-preset-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.section-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section-order-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #808080;
+  background: #fff;
+}
+
+.section-order-position {
+  width: 18px;
+  color: #555;
+  text-align: center;
+}
+
+.section-order-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.budget-label-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.budget-meter {
+  height: 15px;
+  padding: 2px;
+  border: 2px inset var(--win-gray);
+  background: #fff;
+}
+
+.budget-meter-fill {
+  width: 0;
+  height: 100%;
+  background: #008000;
+  transition: width 160ms ease, background-color 160ms ease;
+}
+
+.budget-guard[data-state="near"] .budget-meter-fill { background: #d68a00; }
+.budget-guard[data-state="overflow"] .budget-meter-fill { background: #c00000; }
+
+.budget-state {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #555;
+}
+
+.budget-assistant-toggle { margin-top: 6px; }
+
+.office-assistant {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 8px 22px 8px 7px;
+  border: 1px solid #000;
+  border-radius: 8px;
+  background: #ffffcc;
+  box-shadow: 2px 2px 0 #808080;
+  font-size: 10px;
+}
+
+.office-assistant[hidden] { display: none; }
+.office-assistant p { margin: 3px 0 0; }
+.assistant-icon { font-size: 24px; }
+.assistant-close {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-weight: bold;
+}
+
 
 /* Fieldsets and Panels */
 .win-fieldset {

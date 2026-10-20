@@ -6,3 +6,14 @@ export const SECTION_HEADINGS = {
   PROJECTS: 'Projects',
   CERTIFICATIONS: 'Certifications',
 } as const;
+
+export const SECTION_KEYS = [
+  'summary',
+  'experience',
+  'education',
+  'skills',
+  'certifications',
+  'projects',
+] as const;
+
+export const DEFAULT_SECTION_ORDER = [...SECTION_KEYS];

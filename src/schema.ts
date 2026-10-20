@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SECTION_KEYS } from './constants';
 
 // Tightly scoped: "YYYY" or "YYYY-MM" with valid calendar months 01-12
 export const DatePointSchema = z.string().regex(/^\d{4}(-(0[1-9]|1[0-2]))?$/, {
@@ -108,3 +109,14 @@ export const SectionHeadingsSchema = z
 
 export type SectionHeadings = z.infer<typeof SectionHeadingsSchema>;
 
+export const SectionKeySchema = z.enum(SECTION_KEYS);
+
+export const SectionOrderSchema = z
+  .array(SectionKeySchema)
+  .length(SECTION_KEYS.length, `Section order must contain exactly ${SECTION_KEYS.length} sections`)
+  .refine((order) => new Set(order).size === SECTION_KEYS.length, {
+    message: 'Section order must contain each section exactly once',
+  });
+
+export type SectionKey = z.infer<typeof SectionKeySchema>;
+export type SectionOrder = z.infer<typeof SectionOrderSchema>;

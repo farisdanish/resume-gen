@@ -6,7 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { runExtraction } from './extract';
-import { ResumeSchema, StyleConfigSchema, SectionHeadingsSchema } from './schema';
+import {
+  ResumeSchema,
+  StyleConfigSchema,
+  SectionHeadingsSchema,
+  SectionOrderSchema,
+} from './schema';
 import { renderResume } from './render';
 import { generatePdf } from './pdf';
 
@@ -77,8 +82,16 @@ app.post('/api/preview', async (c) => {
     const styleConfig = styleValidation.success ? styleValidation.data : undefined;
     const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
     const headings = headingsValidation.success ? headingsValidation.data : undefined;
+    const orderValidation = SectionOrderSchema.safeParse(body.sectionOrder);
+    if (body.sectionOrder !== undefined && !orderValidation.success) {
+      return c.json(
+        { success: false, error: 'Invalid section order', issues: orderValidation.error.issues },
+        400
+      );
+    }
+    const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
-    const html = renderResume(validation.data, { styleConfig, headings });
+    const html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
     return c.json({
       success: true,
       html,
@@ -112,8 +125,16 @@ app.post('/api/generate-pdf', async (c) => {
       const styleConfig = styleValidation.success ? styleValidation.data : undefined;
       const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
       const headings = headingsValidation.success ? headingsValidation.data : undefined;
+      const orderValidation = SectionOrderSchema.safeParse(body.sectionOrder);
+      if (body.sectionOrder !== undefined && !orderValidation.success) {
+        return c.json(
+          { success: false, error: 'Invalid section order', issues: orderValidation.error.issues },
+          400
+        );
+      }
+      const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
-      html = renderResume(validation.data, { styleConfig, headings });
+      html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
     }
 
     const { buffer, pageCount, isSinglePage } = await generatePdf({ html });

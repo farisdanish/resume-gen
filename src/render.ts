@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Handlebars from 'handlebars';
-import type { Resume, StyleConfig } from './schema';
-import { SECTION_HEADINGS } from './constants';
+import type { Resume, SectionOrder, StyleConfig } from './schema';
+import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS } from './constants';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = path.resolve(__dirname, '../templates/fonts');
@@ -17,6 +17,7 @@ function loadBase64Font(filename: string): string {
 export interface RenderOptions {
   styleConfig?: StyleConfig;
   headings?: Record<string, string>;
+  sectionOrder?: SectionOrder;
 }
 
 export function renderResume(resume: Resume, options: RenderOptions = {}): string {
@@ -47,7 +48,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
     }
   `;
 
-  const { styleConfig, headings = {} } = options;
+  const { styleConfig, headings = {}, sectionOrder = DEFAULT_SECTION_ORDER } = options;
 
   let dynamicOverrides = '';
   if (styleConfig) {
@@ -116,9 +117,22 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
     ...headings,
   };
 
+  const orderedSections = sectionOrder.map((key) => ({
+    key,
+    resume,
+    headings: resolvedHeadings,
+    isSummary: key === 'summary',
+    isExperience: key === 'experience',
+    isEducation: key === 'education',
+    isSkills: key === 'skills',
+    isCertifications: key === 'certifications',
+    isProjects: key === 'projects',
+  }));
+
   return template({
     ...resume,
     headings: resolvedHeadings,
+    orderedSections,
     inlinedStyles: `<style>${fontCss}\n${userStyles}\n${dynamicOverrides}</style>`,
   });
 }

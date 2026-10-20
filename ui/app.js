@@ -1,6 +1,25 @@
 // Office 2000 Retro Desktop Controller & Interactive Resume Studio
 (() => {
   const STORAGE_KEY = 'resume_gen_draft_v1';
+  const ASSISTANT_KEY = 'resume_gen_office_assistant_enabled';
+  const PROFILE_VERSION = 1;
+  const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects'];
+  const SECTION_LABELS = {
+    summary: 'Summary',
+    experience: 'Experience',
+    education: 'Education',
+    skills: 'Skills',
+    certifications: 'Certifications',
+    projects: 'Projects',
+  };
+  const SECTION_HEADING_KEYS = {
+    summary: 'SUMMARY',
+    experience: 'EXPERIENCE',
+    education: 'EDUCATION',
+    skills: 'SKILLS',
+    certifications: 'CERTIFICATIONS',
+    projects: 'PROJECTS',
+  };
 
   // Central Application State
   let pristineResume = null;
@@ -25,6 +44,9 @@
     CERTIFICATIONS: 'CERTIFICATIONS',
     PROJECTS: 'PROJECTS',
   };
+  let sectionOrder = [...DEFAULT_SECTION_ORDER];
+  let currentBudgetState = 'waiting';
+  const dismissedAssistantStates = new Set();
 
   // DOM Elements - Shell & Diagnostics
   const previewFrame = document.getElementById('preview-frame');
@@ -36,6 +58,15 @@
   const a4Page = document.getElementById('a4-page');
   const zoomSelect = document.getElementById('zoom-select');
   const canvasArea = document.getElementById('canvas-area');
+  const budgetGuard = document.querySelector('.budget-guard');
+  const budgetPercent = document.getElementById('budget-percent');
+  const budgetMeter = document.getElementById('budget-meter');
+  const budgetMeterFill = document.getElementById('budget-meter-fill');
+  const budgetState = document.getElementById('budget-state');
+  const officeAssistant = document.getElementById('office-assistant');
+  const assistantTip = document.getElementById('assistant-tip');
+  const chkOfficeAssistant = document.getElementById('chk-office-assistant');
+  const btnDismissAssistant = document.getElementById('btn-dismiss-assistant');
 
   // DOM Elements - Source & Toolbar Actions
   const radioSources = document.querySelectorAll('input[name="source-type"]');
@@ -95,6 +126,9 @@
   const headingSkills = document.getElementById('heading-skills');
   const headingCertifications = document.getElementById('heading-certifications');
   const headingProjects = document.getElementById('heading-projects');
+  const sectionOrderList = document.getElementById('section-order-list');
+  const btnOrderSenior = document.getElementById('btn-order-senior');
+  const btnOrderGraduate = document.getElementById('btn-order-graduate');
 
   let debounceTimer = null;
 
@@ -212,6 +246,7 @@
         visibility,
         styleConfig,
         sectionHeadings,
+        sectionOrder,
         savedAt: new Date().toISOString(),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bundle));
@@ -230,6 +265,9 @@
         visibility = bundle.visibility || visibility;
         styleConfig = bundle.styleConfig || styleConfig;
         sectionHeadings = bundle.sectionHeadings || sectionHeadings;
+        sectionOrder = isValidSectionOrder(bundle.sectionOrder)
+          ? [...bundle.sectionOrder]
+          : [...DEFAULT_SECTION_ORDER];
         return true;
       }
     } catch (e) {
@@ -328,6 +366,48 @@
     if (headingSkills) headingSkills.value = sectionHeadings.SKILLS || 'SKILLS';
     if (headingCertifications) headingCertifications.value = sectionHeadings.CERTIFICATIONS || 'CERTIFICATIONS';
     if (headingProjects) headingProjects.value = sectionHeadings.PROJECTS || 'PROJECTS';
+    renderSectionOrderController();
+  }
+
+  function isValidSectionOrder(order) {
+    return Array.isArray(order)
+      && order.length === DEFAULT_SECTION_ORDER.length
+      && new Set(order).size === DEFAULT_SECTION_ORDER.length
+      && order.every((key) => DEFAULT_SECTION_ORDER.includes(key));
+  }
+
+  function renderSectionOrderController() {
+    if (!sectionOrderList) return;
+    sectionOrderList.innerHTML = '';
+    sectionOrder.forEach((key, index) => {
+      const row = document.createElement('div');
+      row.className = 'section-order-item';
+      const headingKey = SECTION_HEADING_KEYS[key];
+      const label = sectionHeadings[headingKey] || SECTION_LABELS[key];
+      row.innerHTML = `
+        <span class="section-order-position">${index + 1}.</span>
+        <span class="section-order-name" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+        <button type="button" class="win-button win-button-sm btn-section-up" ${index === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(label)} up">↑</button>
+        <button type="button" class="win-button win-button-sm btn-section-down" ${index === sectionOrder.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(label)} down">↓</button>
+      `;
+      row.querySelector('.btn-section-up')?.addEventListener('click', () => moveSection(index, -1));
+      row.querySelector('.btn-section-down')?.addEventListener('click', () => moveSection(index, 1));
+      sectionOrderList.appendChild(row);
+    });
+  }
+
+  function moveSection(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= sectionOrder.length) return;
+    [sectionOrder[index], sectionOrder[target]] = [sectionOrder[target], sectionOrder[index]];
+    renderSectionOrderController();
+    scheduleDebouncedPreview();
+  }
+
+  function applySectionOrderPreset(order) {
+    sectionOrder = [...order];
+    renderSectionOrderController();
+    scheduleDebouncedPreview();
   }
 
   function updateCharCounter() {
@@ -659,6 +739,7 @@
   ].forEach(({ el, key }) => {
     el?.addEventListener('input', (e) => {
       sectionHeadings[key] = e.target.value;
+      renderSectionOrderController();
       scheduleDebouncedPreview();
     });
   });
@@ -811,6 +892,7 @@
           resume: payload,
           styleConfig,
           headings: sectionHeadings,
+          sectionOrder,
         }),
       });
 
@@ -828,7 +910,7 @@
       if (placeholderOverlay) placeholderOverlay.style.display = 'none';
 
       log('Sandboxed preview successfully updated.', 'info');
-      setStatus('Document rendered in sandbox', 'Page 1/1');
+      updateBudgetIndicator(payload);
     } catch (err) {
       log(`Preview error: ${err.message}`, 'error');
       setStatus('Preview failed', 'Error');
@@ -853,6 +935,7 @@
           resume: payload,
           styleConfig,
           headings: sectionHeadings,
+          sectionOrder,
         }),
       });
 
@@ -903,6 +986,7 @@
         education: {},
         projects: {},
       };
+      sectionOrder = [...DEFAULT_SECTION_ORDER];
       saveStateToStorage();
       populateContentForm();
       renderPreview();
@@ -911,19 +995,95 @@
   }
 
   function exportJson() {
-    const payload = buildPayload();
-    if (!payload) {
+    if (!draftResume) {
       log('No data to export.', 'warn');
       return;
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const profile = {
+      version: PROFILE_VERSION,
+      draftResume,
+      visibility,
+      styleConfig,
+      sectionHeadings,
+      sectionOrder,
+      savedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `resume-${payload.basics?.name?.toLowerCase().replace(/\s+/g, '-') || 'draft'}.json`;
+    a.download = `resume-${draftResume.basics?.name?.toLowerCase().replace(/\s+/g, '-') || 'draft'}-profile.json`;
     a.click();
     URL.revokeObjectURL(url);
-    log('Exported JSON draft.', 'info');
+    log('Exported complete tailored profile.', 'info');
+  }
+
+  function normalizedVisibility(candidate, resume) {
+    const source = candidate && typeof candidate === 'object' ? candidate : {};
+    const contactDefaults = { phone: true, email: true, location: true, github: true, linkedin: true, website: true };
+    const normalizeMap = (value, length) => {
+      const result = {};
+      for (let index = 0; index < length; index += 1) {
+        result[index] = value?.[index] !== false;
+      }
+      return result;
+    };
+    return {
+      contact: Object.fromEntries(Object.keys(contactDefaults).map((key) => [key, source.contact?.[key] !== false])),
+      work: normalizeMap(source.work, resume.work?.length || 0),
+      education: normalizeMap(source.education, resume.education?.length || 0),
+      projects: normalizeMap(source.projects, resume.projects?.length || 0),
+    };
+  }
+
+  function parseImportedProfile(parsed) {
+    const isLegacy = parsed && parsed.basics && Array.isArray(parsed.work);
+    if (!isLegacy && parsed?.version !== PROFILE_VERSION) {
+      throw new Error(`Unsupported profile version: ${parsed?.version ?? 'missing'}`);
+    }
+    const resume = isLegacy ? parsed : parsed.draftResume;
+    if (!resume || !resume.basics || !Array.isArray(resume.work)) {
+      throw new Error('Invalid resume profile: missing draftResume, basics, or work');
+    }
+    const nextStyle = isLegacy ? { fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard' } : parsed.styleConfig;
+    if (!nextStyle
+      || !['modern', 'editorial', 'serif'].includes(nextStyle.fontPairing)
+      || !['compact', 'standard', 'spacious'].includes(nextStyle.density)
+      || !['tight', 'standard', 'spacious'].includes(nextStyle.margins)
+      || !/^#[0-9a-fA-F]{6}$/.test(nextStyle.accentColor)) {
+      throw new Error('Invalid profile style configuration');
+    }
+    const nextHeadings = isLegacy ? { SUMMARY: 'SUMMARY', EXPERIENCE: 'EXPERIENCE', EDUCATION: 'EDUCATION', SKILLS: 'SKILLS', CERTIFICATIONS: 'CERTIFICATIONS', PROJECTS: 'PROJECTS' } : parsed.sectionHeadings;
+    if (!nextHeadings || Object.values(SECTION_HEADING_KEYS).some((key) => typeof nextHeadings[key] !== 'string')) {
+      throw new Error('Invalid profile section headings');
+    }
+    const nextOrder = isLegacy ? [...DEFAULT_SECTION_ORDER] : parsed.sectionOrder;
+    if (!isValidSectionOrder(nextOrder)) throw new Error('Invalid profile section order');
+    return {
+      isLegacy,
+      draftResume: JSON.parse(JSON.stringify(resume)),
+      visibility: normalizedVisibility(isLegacy ? null : parsed.visibility, resume),
+      styleConfig: { ...nextStyle },
+      sectionHeadings: { ...nextHeadings },
+      sectionOrder: [...nextOrder],
+    };
+  }
+
+  async function validateImportedProfile(profile) {
+    const res = await fetch(getApiUrl('/api/preview'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume: profile.draftResume,
+        styleConfig: profile.styleConfig,
+        headings: profile.sectionHeadings,
+        sectionOrder: profile.sectionOrder,
+      }),
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      throw new Error(result.error || 'Profile failed server validation');
+    }
   }
 
   function handleImportJson(e) {
@@ -931,23 +1091,83 @@
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
-        if (!parsed.basics || !parsed.work) {
-          throw new Error('Invalid resume JSON schema: missing basics or work');
-        }
-        draftResume = parsed;
+        const profile = parseImportedProfile(parsed);
+        await validateImportedProfile(profile);
+        draftResume = profile.draftResume;
+        visibility = profile.visibility;
+        styleConfig = profile.styleConfig;
+        sectionHeadings = profile.sectionHeadings;
+        sectionOrder = profile.sectionOrder;
         saveStateToStorage();
         populateContentForm();
-        renderPreview();
-        log(`Imported JSON profile from "${file.name}".`, 'success');
+        await renderPreview();
+        log(`${profile.isLegacy ? 'Imported legacy resume JSON with default settings' : 'Restored complete tailored profile'} from "${file.name}".`, 'success');
       } catch (err) {
         log(`Failed to import JSON: ${err.message}`, 'error');
       }
     };
     reader.readAsText(file);
     e.target.value = '';
+  }
+
+  function estimateBudgetFill(resume) {
+    const summaryLength = resume.basics?.summary?.length || 0;
+    const workWeight = (resume.work || []).reduce((total, item) => {
+      const highlights = (item.highlights || []).reduce(
+        (sum, highlight) => sum + Math.max(2.5, highlight.length / 42),
+        0
+      );
+      return total + 5 + highlights;
+    }, 0);
+    const educationWeight = (resume.education || []).length * 4;
+    const skillsWeight = (resume.skills || []).reduce(
+      (total, category) => total + 2.5 + (category.items || []).join(', ').length / 90,
+      0
+    );
+    const projectWeight = (resume.projects || []).reduce(
+      (total, project) => total + 4 + (project.description?.length || 0) / 55,
+      0
+    );
+    const certificationWeight = (resume.certifications || []).length ? 3.5 : 0;
+    const rawFill = 18 + summaryLength / 45 + workWeight + educationWeight
+      + skillsWeight + projectWeight + certificationWeight;
+    const densityFactor = { compact: 0.88, standard: 1, spacious: 1.12 }[styleConfig.density] || 1;
+    const marginFactor = { tight: 0.93, standard: 1, spacious: 1.08 }[styleConfig.margins] || 1;
+    return Math.max(0, rawFill * densityFactor * marginFactor);
+  }
+
+  function updateBudgetIndicator(resume) {
+    try {
+      const fill = estimateBudgetFill(resume);
+      const state = fill > 100 ? 'overflow' : fill >= 85 ? 'near' : 'comfortable';
+      if (budgetPercent) budgetPercent.textContent = `${Math.round(fill)}%`;
+      if (budgetMeterFill) budgetMeterFill.style.width = `${Math.min(fill, 100)}%`;
+      if (budgetMeter) budgetMeter.setAttribute('aria-valuenow', String(Math.min(Math.round(fill), 100)));
+      if (budgetGuard) budgetGuard.dataset.state = state;
+      if (budgetState) {
+        budgetState.textContent = state === 'overflow'
+          ? 'Overflow likely — generated PDF may exceed one page'
+          : state === 'near' ? 'Near the one-page limit' : 'Comfortable fit';
+      }
+      setStatus('Document rendered in sandbox', state === 'overflow' ? 'Est. 2+ pages' : 'Page 1/1');
+      if (state !== currentBudgetState) {
+        currentBudgetState = state;
+        const enabled = chkOfficeAssistant?.checked !== false;
+        if (enabled && (state === 'near' || state === 'overflow') && !dismissedAssistantStates.has(state)) {
+          if (assistantTip) assistantTip.textContent = state === 'overflow'
+            ? 'Switch to Compact density or Tight margins, then hide a lower-priority item.'
+            : 'Consider shortening a bullet before adding more content.';
+          if (officeAssistant) officeAssistant.hidden = false;
+        } else if (state === 'comfortable' && officeAssistant) {
+          officeAssistant.hidden = true;
+        }
+      }
+    } catch (err) {
+      log(`Budget estimate unavailable: ${err.message}`, 'warn');
+    }
   }
 
   function escapeHtml(str) {
@@ -966,6 +1186,16 @@
   btnExportJson?.addEventListener('click', exportJson);
   btnImportJsonTrigger?.addEventListener('click', () => inputImportJson?.click());
   inputImportJson?.addEventListener('change', handleImportJson);
+  btnOrderSenior?.addEventListener('click', () => applySectionOrderPreset(['summary', 'experience', 'skills', 'projects', 'education', 'certifications']));
+  btnOrderGraduate?.addEventListener('click', () => applySectionOrderPreset(['summary', 'skills', 'projects', 'education', 'experience', 'certifications']));
+  btnDismissAssistant?.addEventListener('click', () => {
+    dismissedAssistantStates.add(currentBudgetState);
+    if (officeAssistant) officeAssistant.hidden = true;
+  });
+  chkOfficeAssistant?.addEventListener('change', (event) => {
+    localStorage.setItem(ASSISTANT_KEY, String(event.target.checked));
+    if (!event.target.checked && officeAssistant) officeAssistant.hidden = true;
+  });
 
   btnRenderPreview?.addEventListener('click', renderPreview);
   btnDownloadPdf?.addEventListener('click', exportPdf);
@@ -979,6 +1209,7 @@
   if (statusHost && window.location.host) {
     statusHost.textContent = window.location.host;
   }
+  if (chkOfficeAssistant) chkOfficeAssistant.checked = localStorage.getItem(ASSISTANT_KEY) !== 'false';
   applyZoom();
   extractData();
 })();

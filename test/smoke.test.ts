@@ -74,6 +74,24 @@ describe('Smoke Test Suite', () => {
     expect(isSinglePage).toBe(true);
   }, 30000);
 
+  test('SMOKE 2B: Customized layout remains a strict single-page PDF', async () => {
+    const html = renderResume(resumeFixture, {
+      styleConfig: {
+        fontPairing: 'modern',
+        accentColor: '#1b4332',
+        density: 'compact',
+        margins: 'tight',
+      },
+      headings: { EXPERIENCE: 'PROFESSIONAL EXPERIENCE', SKILLS: 'CORE SKILLS' },
+      sectionOrder: ['summary', 'skills', 'experience', 'projects', 'education', 'certifications'],
+    });
+    const { buffer, pageCount, isSinglePage } = await generatePdf({ html });
+
+    expect(buffer.length).toBeGreaterThan(0);
+    expect(pageCount).toBe(1);
+    expect(isSinglePage).toBe(true);
+  }, 30000);
+
   // SMOKE 3: Discrete CLI Exit Code Contract
   describe('SMOKE 3: CLI Exit Code Contract', () => {
     const cliScript = path.resolve(ROOT_DIR, 'src/cli.ts');

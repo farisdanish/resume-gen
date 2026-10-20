@@ -152,15 +152,39 @@
                   <span>↺ Reset to Extracted Data</span>
                 </button>
                 <div style="display: flex; gap: 4px;">
-                  <button class="win-button btn-block" id="btn-export-json" title="Download JSON resume file">
-                    <span>💾 Save JSON</span>
+                  <button class="win-button btn-block" id="btn-export-json" title="Download complete tailored profile">
+                    <span>💾 Save Profile</span>
                   </button>
                   <button class="win-button btn-block" id="btn-import-json-trigger" title="Load JSON resume file">
-                    <span>📂 Load JSON</span>
+                    <span>📂 Load Profile</span>
                   </button>
                   <input type="file" id="input-import-json" accept=".json" style="display: none;">
                 </div>
               </div>
+            </fieldset>
+
+            <fieldset class="win-fieldset budget-guard" aria-labelledby="budget-label">
+              <legend class="win-legend">1-Page Budget Guard</legend>
+              <div class="budget-label-row">
+                <span id="budget-label">Estimated page fullness</span>
+                <strong id="budget-percent">0%</strong>
+              </div>
+              <div id="budget-meter" class="budget-meter" role="progressbar" aria-label="Estimated page fullness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="budget-meter-fill" class="budget-meter-fill"></div>
+              </div>
+              <div id="budget-state" class="budget-state">Waiting for preview</div>
+              <label class="win-checkbox-row budget-assistant-toggle">
+                <input type="checkbox" id="chk-office-assistant" checked>
+                <span>Enable Office Assistant tips</span>
+              </label>
+              <aside id="office-assistant" class="office-assistant" hidden aria-live="polite">
+                <button type="button" id="btn-dismiss-assistant" class="assistant-close" aria-label="Dismiss Office Assistant">×</button>
+                <div class="assistant-icon" aria-hidden="true">📎</div>
+                <div>
+                  <strong>It looks like your résumé is getting full.</strong>
+                  <p id="assistant-tip">Try Compact density, Tight margins, hiding an item, or shortening a bullet.</p>
+                </div>
+              </aside>
             </fieldset>
 
             <!-- Actions Section -->
@@ -347,6 +371,14 @@
 
           <!-- 4. SECTION ORDER TAB -->
           <div id="tab-sections" class="tab-pane">
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Section Order</legend>
+              <div class="section-preset-row">
+                <button type="button" class="win-button win-button-sm" id="btn-order-senior">Senior Profile</button>
+                <button type="button" class="win-button win-button-sm" id="btn-order-graduate">New Graduate</button>
+              </div>
+              <div id="section-order-list" class="section-order-list" aria-label="Resume section order"></div>
+            </fieldset>
             <fieldset class="win-fieldset">
               <legend class="win-legend">Section Structure</legend>
               <div style="font-size: 10px; color: #555; margin-bottom: 8px;">

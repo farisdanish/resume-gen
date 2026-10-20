@@ -37,17 +37,21 @@
       </div>
     </header>
 
-    {{#if basics.summary}}
+    {{#each orderedSections}}
+    {{#if isSummary}}
+    {{#if resume.basics.summary}}
     <section class="section">
       <h2 class="section-heading">{{headings.SUMMARY}}</h2>
-      <p class="summary-text">{{basics.summary}}</p>
+      <p class="summary-text">{{resume.basics.summary}}</p>
     </section>
     {{/if}}
+    {{/if}}
 
-    {{#if work.length}}
+    {{#if isExperience}}
+    {{#if resume.work.length}}
     <section class="section">
       <h2 class="section-heading">{{headings.EXPERIENCE}}</h2>
-      {{#each work}}
+      {{#each resume.work}}
       <div class="experience-item">
         <div class="item-header">
           <div class="item-title-group">
@@ -69,11 +73,13 @@
       {{/each}}
     </section>
     {{/if}}
+    {{/if}}
 
-    {{#if education.length}}
+    {{#if isEducation}}
+    {{#if resume.education.length}}
     <section class="section">
       <h2 class="section-heading">{{headings.EDUCATION}}</h2>
-      {{#each education}}
+      {{#each resume.education}}
       <div class="education-item">
         <div class="edu-title-group">
           <span class="edu-degree">{{this.degree}}</span>
@@ -87,11 +93,13 @@
       {{/each}}
     </section>
     {{/if}}
+    {{/if}}
 
-    {{#if skills.length}}
+    {{#if isSkills}}
+    {{#if resume.skills.length}}
     <section class="section">
       <h2 class="section-heading">{{headings.SKILLS}}</h2>
-      {{#each skills}}
+      {{#each resume.skills}}
       <div class="skill-category-row">
         <span class="skill-cat-name">{{this.category}}:</span>
         <span class="skill-cat-items">
@@ -101,20 +109,24 @@
       {{/each}}
     </section>
     {{/if}}
+    {{/if}}
 
-    {{#if certifications.length}}
+    {{#if isCertifications}}
+    {{#if resume.certifications.length}}
     <section class="section">
       <h2 class="section-heading">{{headings.CERTIFICATIONS}}</h2>
       <div class="certs-inline">
-        {{#each certifications}}{{this}}{{#unless @last}} • {{/unless}}{{/each}}
+        {{#each resume.certifications}}{{this}}{{#unless @last}} • {{/unless}}{{/each}}
       </div>
     </section>
     {{/if}}
+    {{/if}}
 
-    {{#if projects.length}}
+    {{#if isProjects}}
+    {{#if resume.projects.length}}
     <section class="section">
       <h2 class="section-heading">{{headings.PROJECTS}}</h2>
-      {{#each projects}}
+      {{#each resume.projects}}
       <div class="project-item">
         <span class="project-title">{{this.title}}</span>
         {{#if this.stack.length}}
@@ -126,6 +138,8 @@
       {{/each}}
     </section>
     {{/if}}
+    {{/if}}
+    {{/each}}
   </div>
 </body>
 </html>
