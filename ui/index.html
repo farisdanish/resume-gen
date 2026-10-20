@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Microsoft Resume 2000 - [Faris Antoni.doc]</title>
+  <title>Microsoft Resume 2000 - [Resume Draft.doc]</title>
   <link rel="stylesheet" href="/office2000.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <header class="win-titlebar">
       <div class="win-title-left">
         <span class="win-icon">W</span>
-        <span class="win-title-text">Microsoft Resume 2000 - [Faris Antoni.doc]</span>
+        <span class="win-title-text">Microsoft Resume 2000 - [Resume Draft.doc]</span>
       </div>
       <div class="win-controls">
         <button class="win-btn-control" title="Minimize" id="btn-minimize">_</button>
@@ -229,6 +229,28 @@
                 <textarea id="edit-summary" class="win-textarea" rows="3" placeholder="Candidate summary statement..."></textarea>
                 <div class="char-counter" id="char-counter-summary">0 characters</div>
               </div>
+              <div class="form-group headshot-editor">
+                <label class="win-checkbox-row">
+                  <input type="checkbox" id="chk-headshot-include">
+                  <span class="form-label">Include professional headshot</span>
+                </label>
+                <input type="file" id="input-headshot" accept="image/png,image/jpeg,image/webp" class="win-input">
+                <div class="headshot-control-row">
+                  <select id="select-headshot-shape" class="win-input" aria-label="Headshot shape">
+                    <option value="circle">Circle</option>
+                    <option value="rounded">Rounded rectangle</option>
+                  </select>
+                  <select id="select-headshot-position" class="win-input" aria-label="Headshot position">
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+                <div class="headshot-preview-row">
+                  <img id="headshot-preview" class="headshot-preview" alt="Selected headshot preview" hidden>
+                  <button type="button" id="btn-remove-headshot" class="win-button win-button-sm" disabled>Remove Photo</button>
+                </div>
+                <div id="headshot-message" class="char-counter">PNG, JPEG, or WebP; processed locally.</div>
+              </div>
             </fieldset>
 
             <!-- Contact Information Section -->
@@ -274,7 +296,7 @@
                   <input type="checkbox" id="chk-contact-website" checked>
                   <span class="form-label">Website URL:</span>
                 </label>
-                <input type="text" id="input-website" class="win-input" placeholder="https://farisantoni.com">
+                <input type="text" id="input-website" class="win-input" placeholder="https://alexmorgan.example">
               </div>
             </fieldset>
 
@@ -305,6 +327,22 @@
               </div>
               <div id="proj-items-container" style="margin-top: 8px;">
                 <!-- Dynamically populated project items -->
+              </div>
+            </fieldset>
+
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">References</legend>
+              <div class="form-group">
+                <label for="select-references-mode" class="form-label">Display:</label>
+                <select id="select-references-mode" class="win-input">
+                  <option value="none">Do not include</option>
+                  <option value="available-on-request">Available upon request</option>
+                  <option value="entries">Referee details</option>
+                </select>
+              </div>
+              <div id="references-editor" hidden>
+                <div id="references-items-container"></div>
+                <button type="button" id="btn-add-reference" class="win-button win-button-sm">+ Add Referee</button>
               </div>
             </fieldset>
           </div>
@@ -367,6 +405,30 @@
                 </select>
               </div>
             </fieldset>
+
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Text Alignment</legend>
+              <div class="form-group">
+                <label for="select-body-alignment" class="form-label">Body paragraphs:</label>
+                <select id="select-body-alignment" class="win-input">
+                  <option value="justify">Justified</option>
+                  <option value="left">Left aligned</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="select-header-alignment" class="form-label">Candidate header:</label>
+                <select id="select-header-alignment" class="win-input">
+                  <option value="left">Left aligned</option>
+                  <option value="center">Centered</option>
+                </select>
+              </div>
+            </fieldset>
+
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Per-Section Font Scale</legend>
+              <div id="section-scale-controls" class="section-scale-controls"></div>
+              <button type="button" id="btn-reset-section-scales" class="win-button win-button-sm">Reset All to 100%</button>
+            </fieldset>
           </div>
 
           <!-- 4. SECTION ORDER TAB -->
@@ -407,6 +469,10 @@
               <div class="form-group">
                 <label for="heading-projects" class="form-label">Projects Heading:</label>
                 <input type="text" id="heading-projects" class="win-input" value="PROJECTS">
+              </div>
+              <div class="form-group">
+                <label for="heading-references" class="form-label">References Heading:</label>
+                <input type="text" id="heading-references" class="win-input" value="REFERENCES">
               </div>
             </fieldset>
           </div>

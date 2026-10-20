@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Handlebars from 'handlebars';
-import type { Resume, SectionOrder, StyleConfig } from './schema';
+import type { Resume, SectionOrder, StyleConfigInput } from './schema';
 import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS } from './constants';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +15,7 @@ function loadBase64Font(filename: string): string {
 }
 
 export interface RenderOptions {
-  styleConfig?: StyleConfig;
+  styleConfig?: StyleConfigInput;
   headings?: Record<string, string>;
   sectionOrder?: SectionOrder;
 }
@@ -104,6 +104,15 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
         --font-name-size: ${nameSize};
         --page-padding-y: ${paddingY};
         --page-padding-x: ${paddingX};
+        --body-align: ${styleConfig.bodyAlignment ?? 'justify'};
+        --header-align: ${styleConfig.headerAlignment ?? 'left'};
+        --scale-summary: ${styleConfig.sectionScale?.summary ?? 1};
+        --scale-experience: ${styleConfig.sectionScale?.experience ?? 1};
+        --scale-education: ${styleConfig.sectionScale?.education ?? 1};
+        --scale-skills: ${styleConfig.sectionScale?.skills ?? 1};
+        --scale-certifications: ${styleConfig.sectionScale?.certifications ?? 1};
+        --scale-projects: ${styleConfig.sectionScale?.projects ?? 1};
+        --scale-references: ${styleConfig.sectionScale?.references ?? 1};
       }
     `;
   }
@@ -127,6 +136,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
     isSkills: key === 'skills',
     isCertifications: key === 'certifications',
     isProjects: key === 'projects',
+    isReferences: key === 'references',
   }));
 
   return template({

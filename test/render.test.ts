@@ -44,8 +44,12 @@ describe('Template & Render Engine', () => {
   });
 
   it('renders sections in a user-defined order', () => {
-    const html = renderResume(resumeFixture, {
-      sectionOrder: ['summary', 'skills', 'projects', 'education', 'experience', 'certifications'],
+    const resumeWithReferences = {
+      ...resumeFixture,
+      references: { mode: 'available-on-request' as const },
+    };
+    const html = renderResume(resumeWithReferences, {
+      sectionOrder: ['summary', 'skills', 'projects', 'education', 'experience', 'certifications', 'references'],
       headings: {
         SUMMARY: 'ORDER SUMMARY',
         SKILLS: 'ORDER SKILLS',
@@ -53,6 +57,7 @@ describe('Template & Render Engine', () => {
         EDUCATION: 'ORDER EDUCATION',
         EXPERIENCE: 'ORDER EXPERIENCE',
         CERTIFICATIONS: 'ORDER CERTIFICATIONS',
+        REFERENCES: 'ORDER REFERENCES',
       },
     });
 
@@ -62,6 +67,7 @@ describe('Template & Render Engine', () => {
     const education = html.indexOf('ORDER EDUCATION');
     const experience = html.indexOf('ORDER EXPERIENCE');
     const certifications = html.indexOf('ORDER CERTIFICATIONS');
+    const references = html.indexOf('ORDER REFERENCES');
 
     expect(summary).toBeGreaterThan(-1);
     expect(skills).toBeGreaterThan(summary);
@@ -69,5 +75,37 @@ describe('Template & Render Engine', () => {
     expect(education).toBeGreaterThan(projects);
     expect(experience).toBeGreaterThan(education);
     expect(certifications).toBeGreaterThan(experience);
+    expect(references).toBeGreaterThan(certifications);
+  });
+
+  it('renders Phase 9 alignment, scales, references, and a safe headshot', () => {
+    const dataUri = 'data:image/png;base64,iVBORw0KGgo=';
+    const html = renderResume({
+      ...resumeFixture,
+      basics: {
+        ...resumeFixture.basics,
+        headshot: { dataUri, shape: 'rounded', position: 'right' },
+      },
+      references: {
+        mode: 'entries',
+        entries: [{ name: 'Jordan Lee', title: 'Engineering Director', email: 'jordan.lee@example.com' }],
+      },
+    }, {
+      styleConfig: {
+        bodyAlignment: 'left',
+        headerAlignment: 'center',
+        sectionScale: { experience: 0.9, references: 1.1 },
+      },
+    });
+
+    expect(html).toContain('--body-align: left');
+    expect(html).toContain('--header-align: center');
+    expect(html).toContain('--scale-experience: 0.9');
+    expect(html).toContain('--scale-references: 1.1');
+    expect(html).toContain('headshot-rounded');
+    expect(html).toContain('headshot-right');
+    expect(html).toContain('data:image/png;base64');
+    expect(html).toContain('Jordan Lee');
+    expect(html).toContain('jordan.lee@example.com');
   });
 });

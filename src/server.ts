@@ -79,8 +79,20 @@ app.post('/api/preview', async (c) => {
     }
 
     const styleValidation = StyleConfigSchema.safeParse(body.styleConfig);
+    if (body.styleConfig !== undefined && !styleValidation.success) {
+      return c.json(
+        { success: false, error: 'Invalid style configuration', issues: styleValidation.error.issues },
+        400
+      );
+    }
     const styleConfig = styleValidation.success ? styleValidation.data : undefined;
     const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
+    if (body.headings !== undefined && !headingsValidation.success) {
+      return c.json(
+        { success: false, error: 'Invalid section headings', issues: headingsValidation.error.issues },
+        400
+      );
+    }
     const headings = headingsValidation.success ? headingsValidation.data : undefined;
     const orderValidation = SectionOrderSchema.safeParse(body.sectionOrder);
     if (body.sectionOrder !== undefined && !orderValidation.success) {
@@ -122,8 +134,20 @@ app.post('/api/generate-pdf', async (c) => {
       }
 
       const styleValidation = StyleConfigSchema.safeParse(body.styleConfig);
+      if (body.styleConfig !== undefined && !styleValidation.success) {
+        return c.json(
+          { success: false, error: 'Invalid style configuration', issues: styleValidation.error.issues },
+          400
+        );
+      }
       const styleConfig = styleValidation.success ? styleValidation.data : undefined;
       const headingsValidation = SectionHeadingsSchema.safeParse(body.headings);
+      if (body.headings !== undefined && !headingsValidation.success) {
+        return c.json(
+          { success: false, error: 'Invalid section headings', issues: headingsValidation.error.issues },
+          400
+        );
+      }
       const headings = headingsValidation.success ? headingsValidation.data : undefined;
       const orderValidation = SectionOrderSchema.safeParse(body.sectionOrder);
       if (body.sectionOrder !== undefined && !orderValidation.success) {

@@ -3,7 +3,7 @@
   const STORAGE_KEY = 'resume_gen_draft_v1';
   const ASSISTANT_KEY = 'resume_gen_office_assistant_enabled';
   const PROFILE_VERSION = 1;
-  const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects'];
+  const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects', 'references'];
   const SECTION_LABELS = {
     summary: 'Summary',
     experience: 'Experience',
@@ -11,6 +11,7 @@
     skills: 'Skills',
     certifications: 'Certifications',
     projects: 'Projects',
+    references: 'References',
   };
   const SECTION_HEADING_KEYS = {
     summary: 'SUMMARY',
@@ -19,6 +20,7 @@
     skills: 'SKILLS',
     certifications: 'CERTIFICATIONS',
     projects: 'PROJECTS',
+    references: 'REFERENCES',
   };
 
   // Central Application State
@@ -29,12 +31,17 @@
     work: {},      // index -> boolean
     education: {}, // index -> boolean
     projects: {},  // index -> boolean
+    references: {}, // index -> boolean
+    headshot: true,
   };
   let styleConfig = {
     fontPairing: 'editorial',
     accentColor: '#2b6cb0',
     density: 'standard',
     margins: 'standard',
+    bodyAlignment: 'justify',
+    headerAlignment: 'left',
+    sectionScale: {},
   };
   let sectionHeadings = {
     SUMMARY: 'SUMMARY',
@@ -43,6 +50,7 @@
     SKILLS: 'SKILLS',
     CERTIFICATIONS: 'CERTIFICATIONS',
     PROJECTS: 'PROJECTS',
+    REFERENCES: 'REFERENCES',
   };
   let sectionOrder = [...DEFAULT_SECTION_ORDER];
   let currentBudgetState = 'waiting';
@@ -104,12 +112,23 @@
   const chkContactGithub = document.getElementById('chk-contact-github');
   const chkContactLinkedin = document.getElementById('chk-contact-linkedin');
   const chkContactWebsite = document.getElementById('chk-contact-website');
+  const chkHeadshotInclude = document.getElementById('chk-headshot-include');
+  const inputHeadshot = document.getElementById('input-headshot');
+  const selectHeadshotShape = document.getElementById('select-headshot-shape');
+  const selectHeadshotPosition = document.getElementById('select-headshot-position');
+  const headshotPreview = document.getElementById('headshot-preview');
+  const btnRemoveHeadshot = document.getElementById('btn-remove-headshot');
+  const headshotMessage = document.getElementById('headshot-message');
 
   // DOM Elements - Content Containers
   const workItemsContainer = document.getElementById('work-items-container');
   const skillsItemsContainer = document.getElementById('skills-items-container');
   const eduItemsContainer = document.getElementById('edu-items-container');
   const projItemsContainer = document.getElementById('proj-items-container');
+  const selectReferencesMode = document.getElementById('select-references-mode');
+  const referencesEditor = document.getElementById('references-editor');
+  const referencesItemsContainer = document.getElementById('references-items-container');
+  const btnAddReference = document.getElementById('btn-add-reference');
 
   // DOM Elements - Design & Styling
   const selectFontPairing = document.getElementById('select-font-pairing');
@@ -118,6 +137,10 @@
   const colorSwatches = document.getElementById('color-swatches');
   const inputCustomColor = document.getElementById('input-custom-color');
   const inputColorHex = document.getElementById('input-color-hex');
+  const selectBodyAlignment = document.getElementById('select-body-alignment');
+  const selectHeaderAlignment = document.getElementById('select-header-alignment');
+  const sectionScaleControls = document.getElementById('section-scale-controls');
+  const btnResetSectionScales = document.getElementById('btn-reset-section-scales');
 
   // DOM Elements - Section Headings
   const headingSummary = document.getElementById('heading-summary');
@@ -126,6 +149,7 @@
   const headingSkills = document.getElementById('heading-skills');
   const headingCertifications = document.getElementById('heading-certifications');
   const headingProjects = document.getElementById('heading-projects');
+  const headingReferences = document.getElementById('heading-references');
   const sectionOrderList = document.getElementById('section-order-list');
   const btnOrderSenior = document.getElementById('btn-order-senior');
   const btnOrderGraduate = document.getElementById('btn-order-graduate');
@@ -262,12 +286,15 @@
       const bundle = JSON.parse(raw);
       if (bundle && bundle.draftResume) {
         draftResume = bundle.draftResume;
-        visibility = bundle.visibility || visibility;
-        styleConfig = bundle.styleConfig || styleConfig;
-        sectionHeadings = bundle.sectionHeadings || sectionHeadings;
-        sectionOrder = isValidSectionOrder(bundle.sectionOrder)
-          ? [...bundle.sectionOrder]
-          : [...DEFAULT_SECTION_ORDER];
+        visibility = { ...visibility, ...(bundle.visibility || {}) };
+        visibility.contact = { ...visibility.contact, ...(bundle.visibility?.contact || {}) };
+        styleConfig = {
+          ...styleConfig,
+          ...(bundle.styleConfig || {}),
+          sectionScale: { ...(bundle.styleConfig?.sectionScale || {}) },
+        };
+        sectionHeadings = { ...sectionHeadings, ...(bundle.sectionHeadings || {}) };
+        sectionOrder = normalizeSectionOrder(bundle.sectionOrder);
         return true;
       }
     } catch (e) {
@@ -298,6 +325,7 @@
       if (!visibility.contact.linkedin) delete cloned.basics.contact.linkedin;
       if (!visibility.contact.website) delete cloned.basics.contact.website;
     }
+    if (cloned.basics?.headshot && visibility.headshot === false) delete cloned.basics.headshot;
 
     // 2. Filter Work items
     if (cloned.work && Array.isArray(cloned.work)) {
@@ -312,6 +340,13 @@
     // 4. Filter Projects items
     if (cloned.projects && Array.isArray(cloned.projects)) {
       cloned.projects = cloned.projects.filter((_, idx) => visibility.projects[idx] !== false);
+    }
+
+    if (cloned.references?.mode === 'entries') {
+      cloned.references.entries = cloned.references.entries.filter(
+        (_, idx) => visibility.references?.[idx] !== false
+      );
+      if (!cloned.references.entries.length) delete cloned.references;
     }
 
     return cloned;
@@ -343,6 +378,7 @@
     if (chkContactGithub) chkContactGithub.checked = visibility.contact.github !== false;
     if (chkContactLinkedin) chkContactLinkedin.checked = visibility.contact.linkedin !== false;
     if (chkContactWebsite) chkContactWebsite.checked = visibility.contact.website !== false;
+    populateHeadshotControls();
 
     // Work Experience
     renderWorkExperienceEditor();
@@ -352,11 +388,15 @@
 
     // Education & Projects
     renderEduAndProjectsEditor();
+    renderReferencesEditor();
 
     // Design & Theme controls
     if (selectFontPairing) selectFontPairing.value = styleConfig.fontPairing || 'editorial';
     if (selectDensity) selectDensity.value = styleConfig.density || 'standard';
     if (selectMargins) selectMargins.value = styleConfig.margins || 'standard';
+    if (selectBodyAlignment) selectBodyAlignment.value = styleConfig.bodyAlignment || 'justify';
+    if (selectHeaderAlignment) selectHeaderAlignment.value = styleConfig.headerAlignment || 'left';
+    renderSectionScaleControls();
     updateAccentColorUI(styleConfig.accentColor || '#2b6cb0');
 
     // Section Headings
@@ -366,6 +406,7 @@
     if (headingSkills) headingSkills.value = sectionHeadings.SKILLS || 'SKILLS';
     if (headingCertifications) headingCertifications.value = sectionHeadings.CERTIFICATIONS || 'CERTIFICATIONS';
     if (headingProjects) headingProjects.value = sectionHeadings.PROJECTS || 'PROJECTS';
+    if (headingReferences) headingReferences.value = sectionHeadings.REFERENCES || 'REFERENCES';
     renderSectionOrderController();
   }
 
@@ -374,6 +415,18 @@
       && order.length === DEFAULT_SECTION_ORDER.length
       && new Set(order).size === DEFAULT_SECTION_ORDER.length
       && order.every((key) => DEFAULT_SECTION_ORDER.includes(key));
+  }
+
+  function normalizeSectionOrder(order) {
+    if (isValidSectionOrder(order)) return [...order];
+    const legacyKeys = DEFAULT_SECTION_ORDER.filter((key) => key !== 'references');
+    if (Array.isArray(order)
+      && order.length === legacyKeys.length
+      && new Set(order).size === legacyKeys.length
+      && order.every((key) => legacyKeys.includes(key))) {
+      return [...order, 'references'];
+    }
+    return [...DEFAULT_SECTION_ORDER];
   }
 
   function renderSectionOrderController() {
@@ -676,6 +729,122 @@
     }
   }
 
+  function populateHeadshotControls() {
+    const headshot = draftResume?.basics?.headshot;
+    if (chkHeadshotInclude) chkHeadshotInclude.checked = Boolean(headshot) && visibility.headshot !== false;
+    if (selectHeadshotShape) selectHeadshotShape.value = headshot?.shape || 'circle';
+    if (selectHeadshotPosition) selectHeadshotPosition.value = headshot?.position || 'left';
+    if (headshotPreview) {
+      headshotPreview.hidden = !headshot;
+      if (headshot) headshotPreview.src = headshot.dataUri;
+      else headshotPreview.removeAttribute('src');
+    }
+    if (btnRemoveHeadshot) btnRemoveHeadshot.disabled = !headshot;
+  }
+
+  function renderReferencesEditor() {
+    if (!selectReferencesMode || !referencesItemsContainer || !referencesEditor) return;
+    const references = draftResume.references;
+    selectReferencesMode.value = references?.mode || 'none';
+    referencesEditor.hidden = references?.mode !== 'entries';
+    referencesItemsContainer.innerHTML = '';
+    if (references?.mode !== 'entries') return;
+
+    references.entries.forEach((reference, index) => {
+      const card = document.createElement('div');
+      card.className = 'reference-editor-card';
+      const included = visibility.references?.[index] !== false;
+      card.innerHTML = `
+        <label class="win-checkbox-row">
+          <input type="checkbox" class="reference-include" ${included ? 'checked' : ''}>
+          <strong>Include referee ${index + 1}</strong>
+        </label>
+        <div class="reference-editor-grid">
+          <input class="win-input reference-field" data-field="name" value="${escapeHtml(reference.name || '')}" placeholder="Name" aria-label="Reference name">
+          <input class="win-input reference-field" data-field="title" value="${escapeHtml(reference.title || '')}" placeholder="Title" aria-label="Reference title">
+          <input class="win-input reference-field" data-field="organization" value="${escapeHtml(reference.organization || '')}" placeholder="Organization" aria-label="Reference organization">
+          <input class="win-input reference-field" data-field="email" value="${escapeHtml(reference.email || '')}" placeholder="Email" aria-label="Reference email">
+          <input class="win-input reference-field" data-field="phone" value="${escapeHtml(reference.phone || '')}" placeholder="Phone" aria-label="Reference phone">
+          <button type="button" class="win-button win-button-sm reference-delete">Delete</button>
+        </div>
+      `;
+      card.querySelector('.reference-include').addEventListener('change', (event) => {
+        visibility.references[index] = event.target.checked;
+        scheduleDebouncedPreview();
+      });
+      card.querySelectorAll('.reference-field').forEach((input) => {
+        input.addEventListener('input', (event) => {
+          const field = event.target.dataset.field;
+          const value = event.target.value.trim();
+          if (value) reference[field] = value;
+          else delete reference[field];
+          scheduleDebouncedPreview();
+        });
+      });
+      card.querySelector('.reference-delete').addEventListener('click', () => {
+        references.entries.splice(index, 1);
+        if (!references.entries.length) delete draftResume.references;
+        visibility.references = {};
+        renderReferencesEditor();
+        scheduleDebouncedPreview();
+      });
+      referencesItemsContainer.appendChild(card);
+    });
+  }
+
+  function renderSectionScaleControls() {
+    if (!sectionScaleControls) return;
+    sectionScaleControls.innerHTML = '';
+    DEFAULT_SECTION_ORDER.forEach((key) => {
+      const row = document.createElement('label');
+      row.className = 'section-scale-row';
+      row.innerHTML = `
+        <span>${SECTION_LABELS[key]}</span>
+        <select class="win-input section-scale-select" data-section="${key}">
+          ${[0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15].map((scale) =>
+            `<option value="${scale}" ${(styleConfig.sectionScale?.[key] || 1) === scale ? 'selected' : ''}>${Math.round(scale * 100)}%</option>`
+          ).join('')}
+        </select>
+      `;
+      row.querySelector('select').addEventListener('change', (event) => {
+        const scale = Number(event.target.value);
+        if (!styleConfig.sectionScale) styleConfig.sectionScale = {};
+        if (scale === 1) delete styleConfig.sectionScale[key];
+        else styleConfig.sectionScale[key] = scale;
+        scheduleDebouncedPreview();
+      });
+      sectionScaleControls.appendChild(row);
+    });
+  }
+
+  async function processHeadshot(file) {
+    if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      throw new Error('Choose a PNG, JPEG, or WebP image');
+    }
+    if (file.size > 5_000_000) throw new Error('Source image must be smaller than 5 MB');
+    const source = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Unable to read image file'));
+      reader.readAsDataURL(file);
+    });
+    const image = await new Promise((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = () => reject(new Error('Unable to decode image file'));
+      candidate.src = source;
+    });
+    const scale = Math.min(1, 400 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const dataUri = canvas.toDataURL('image/jpeg', 0.82);
+    if (dataUri.length > 700_000) throw new Error('Processed image remains too large; choose a smaller photo');
+    return dataUri;
+  }
+
   // --- Design & Theme UI Sync ---
   function updateAccentColorUI(color) {
     styleConfig.accentColor = color;
@@ -728,6 +897,22 @@
     scheduleDebouncedPreview();
   });
 
+  selectBodyAlignment?.addEventListener('change', (e) => {
+    styleConfig.bodyAlignment = e.target.value;
+    scheduleDebouncedPreview();
+  });
+
+  selectHeaderAlignment?.addEventListener('change', (e) => {
+    styleConfig.headerAlignment = e.target.value;
+    scheduleDebouncedPreview();
+  });
+
+  btnResetSectionScales?.addEventListener('click', () => {
+    styleConfig.sectionScale = {};
+    renderSectionScaleControls();
+    scheduleDebouncedPreview();
+  });
+
   // --- Section Headings Sync ---
   [
     { el: headingSummary, key: 'SUMMARY' },
@@ -736,6 +921,7 @@
     { el: headingSkills, key: 'SKILLS' },
     { el: headingCertifications, key: 'CERTIFICATIONS' },
     { el: headingProjects, key: 'PROJECTS' },
+    { el: headingReferences, key: 'REFERENCES' },
   ].forEach(({ el, key }) => {
     el?.addEventListener('input', (e) => {
       sectionHeadings[key] = e.target.value;
@@ -758,6 +944,78 @@
   editSummary?.addEventListener('input', (e) => {
     if (draftResume?.basics) draftResume.basics.summary = e.target.value;
     updateCharCounter();
+    scheduleDebouncedPreview();
+  });
+
+  inputHeadshot?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !draftResume?.basics) return;
+    try {
+      if (headshotMessage) headshotMessage.textContent = 'Processing image locally...';
+      const dataUri = await processHeadshot(file);
+      draftResume.basics.headshot = {
+        dataUri,
+        shape: selectHeadshotShape?.value || 'circle',
+        position: selectHeadshotPosition?.value || 'left',
+      };
+      visibility.headshot = true;
+      if (headshotMessage) headshotMessage.textContent = 'Photo processed locally; no upload occurred.';
+      populateHeadshotControls();
+      scheduleDebouncedPreview();
+    } catch (err) {
+      if (headshotMessage) headshotMessage.textContent = err.message;
+      log(`Headshot rejected: ${err.message}`, 'warn');
+    } finally {
+      event.target.value = '';
+    }
+  });
+
+  chkHeadshotInclude?.addEventListener('change', (event) => {
+    if (event.target.checked && !draftResume?.basics?.headshot) {
+      event.target.checked = false;
+      if (headshotMessage) headshotMessage.textContent = 'Choose an image before enabling the headshot.';
+      return;
+    }
+    visibility.headshot = event.target.checked;
+    scheduleDebouncedPreview();
+  });
+
+  selectHeadshotShape?.addEventListener('change', (event) => {
+    if (draftResume?.basics?.headshot) draftResume.basics.headshot.shape = event.target.value;
+    scheduleDebouncedPreview();
+  });
+
+  selectHeadshotPosition?.addEventListener('change', (event) => {
+    if (draftResume?.basics?.headshot) draftResume.basics.headshot.position = event.target.value;
+    scheduleDebouncedPreview();
+  });
+
+  btnRemoveHeadshot?.addEventListener('click', () => {
+    if (draftResume?.basics) delete draftResume.basics.headshot;
+    visibility.headshot = true;
+    populateHeadshotControls();
+    scheduleDebouncedPreview();
+  });
+
+  selectReferencesMode?.addEventListener('change', (event) => {
+    const mode = event.target.value;
+    if (mode === 'none') delete draftResume.references;
+    else if (mode === 'available-on-request') draftResume.references = { mode };
+    else if (mode === 'entries') {
+      draftResume.references = draftResume.references?.mode === 'entries'
+        ? draftResume.references
+        : { mode, entries: [{ name: 'Reference Name', title: 'Professional Title' }] };
+    }
+    renderReferencesEditor();
+    scheduleDebouncedPreview();
+  });
+
+  btnAddReference?.addEventListener('click', () => {
+    if (!draftResume.references || draftResume.references.mode !== 'entries') {
+      draftResume.references = { mode: 'entries', entries: [] };
+    }
+    draftResume.references.entries.push({ name: 'Reference Name', title: 'Professional Title' });
+    renderReferencesEditor();
     scheduleDebouncedPreview();
   });
 
@@ -959,7 +1217,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `resume-${payload.basics?.name?.toLowerCase().replace(/\s+/g, '-') || 'farisantoni'}.pdf`;
+      a.download = `resume-${payload.basics?.name?.toLowerCase().replace(/\s+/g, '-') || 'candidate'}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -985,6 +1243,16 @@
         work: {},
         education: {},
         projects: {},
+        references: {},
+        headshot: true,
+      };
+      styleConfig = {
+        fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard',
+        bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {},
+      };
+      sectionHeadings = {
+        SUMMARY: 'SUMMARY', EXPERIENCE: 'EXPERIENCE', EDUCATION: 'EDUCATION', SKILLS: 'SKILLS',
+        CERTIFICATIONS: 'CERTIFICATIONS', PROJECTS: 'PROJECTS', REFERENCES: 'REFERENCES',
       };
       sectionOrder = [...DEFAULT_SECTION_ORDER];
       saveStateToStorage();
@@ -999,9 +1267,11 @@
       log('No data to export.', 'warn');
       return;
     }
+    const exportedDraft = JSON.parse(JSON.stringify(draftResume));
+    if (visibility.headshot === false && exportedDraft.basics) delete exportedDraft.basics.headshot;
     const profile = {
       version: PROFILE_VERSION,
-      draftResume,
+      draftResume: exportedDraft,
       visibility,
       styleConfig,
       sectionHeadings,
@@ -1033,6 +1303,8 @@
       work: normalizeMap(source.work, resume.work?.length || 0),
       education: normalizeMap(source.education, resume.education?.length || 0),
       projects: normalizeMap(source.projects, resume.projects?.length || 0),
+      references: normalizeMap(source.references, resume.references?.mode === 'entries' ? resume.references.entries.length : 0),
+      headshot: source.headshot !== false,
     };
   }
 
@@ -1045,20 +1317,36 @@
     if (!resume || !resume.basics || !Array.isArray(resume.work)) {
       throw new Error('Invalid resume profile: missing draftResume, basics, or work');
     }
-    const nextStyle = isLegacy ? { fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard' } : parsed.styleConfig;
+    const styleDefaults = {
+      fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard',
+      bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {},
+    };
+    const nextStyle = { ...styleDefaults, ...(isLegacy ? {} : parsed.styleConfig), sectionScale: { ...(isLegacy ? {} : parsed.styleConfig?.sectionScale) } };
     if (!nextStyle
       || !['modern', 'editorial', 'serif'].includes(nextStyle.fontPairing)
       || !['compact', 'standard', 'spacious'].includes(nextStyle.density)
       || !['tight', 'standard', 'spacious'].includes(nextStyle.margins)
+      || !['left', 'justify'].includes(nextStyle.bodyAlignment)
+      || !['left', 'center'].includes(nextStyle.headerAlignment)
+      || Object.entries(nextStyle.sectionScale).some(([key, value]) =>
+        !DEFAULT_SECTION_ORDER.includes(key)
+        || ![0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15].includes(value))
       || !/^#[0-9a-fA-F]{6}$/.test(nextStyle.accentColor)) {
       throw new Error('Invalid profile style configuration');
     }
-    const nextHeadings = isLegacy ? { SUMMARY: 'SUMMARY', EXPERIENCE: 'EXPERIENCE', EDUCATION: 'EDUCATION', SKILLS: 'SKILLS', CERTIFICATIONS: 'CERTIFICATIONS', PROJECTS: 'PROJECTS' } : parsed.sectionHeadings;
+    const headingDefaults = { SUMMARY: 'SUMMARY', EXPERIENCE: 'EXPERIENCE', EDUCATION: 'EDUCATION', SKILLS: 'SKILLS', CERTIFICATIONS: 'CERTIFICATIONS', PROJECTS: 'PROJECTS', REFERENCES: 'REFERENCES' };
+    const nextHeadings = { ...headingDefaults, ...(isLegacy ? {} : parsed.sectionHeadings) };
     if (!nextHeadings || Object.values(SECTION_HEADING_KEYS).some((key) => typeof nextHeadings[key] !== 'string')) {
       throw new Error('Invalid profile section headings');
     }
-    const nextOrder = isLegacy ? [...DEFAULT_SECTION_ORDER] : parsed.sectionOrder;
-    if (!isValidSectionOrder(nextOrder)) throw new Error('Invalid profile section order');
+    const requestedOrder = isLegacy ? [...DEFAULT_SECTION_ORDER] : parsed.sectionOrder;
+    const legacyKeys = DEFAULT_SECTION_ORDER.filter((key) => key !== 'references');
+    const isLegacyOrder = Array.isArray(requestedOrder)
+      && requestedOrder.length === legacyKeys.length
+      && new Set(requestedOrder).size === legacyKeys.length
+      && requestedOrder.every((key) => legacyKeys.includes(key));
+    if (!isValidSectionOrder(requestedOrder) && !isLegacyOrder) throw new Error('Invalid profile section order');
+    const nextOrder = normalizeSectionOrder(requestedOrder);
     return {
       isLegacy,
       draftResume: JSON.parse(JSON.stringify(resume)),
@@ -1132,11 +1420,19 @@
       0
     );
     const certificationWeight = (resume.certifications || []).length ? 3.5 : 0;
+    const referenceWeight = resume.references?.mode === 'entries'
+      ? resume.references.entries.length * 4
+      : resume.references ? 2.5 : 0;
+    const headshotWeight = resume.basics?.headshot ? 5 : 0;
+    const scales = Object.values(styleConfig.sectionScale || {});
+    const sectionScaleFactor = scales.length
+      ? scales.reduce((sum, scale) => sum + scale, 0) / scales.length
+      : 1;
     const rawFill = 18 + summaryLength / 45 + workWeight + educationWeight
-      + skillsWeight + projectWeight + certificationWeight;
+      + skillsWeight + projectWeight + certificationWeight + referenceWeight + headshotWeight;
     const densityFactor = { compact: 0.88, standard: 1, spacious: 1.12 }[styleConfig.density] || 1;
     const marginFactor = { tight: 0.93, standard: 1, spacious: 1.08 }[styleConfig.margins] || 1;
-    return Math.max(0, rawFill * densityFactor * marginFactor);
+    return Math.max(0, rawFill * densityFactor * marginFactor * sectionScaleFactor);
   }
 
   function updateBudgetIndicator(resume) {
@@ -1186,8 +1482,8 @@
   btnExportJson?.addEventListener('click', exportJson);
   btnImportJsonTrigger?.addEventListener('click', () => inputImportJson?.click());
   inputImportJson?.addEventListener('change', handleImportJson);
-  btnOrderSenior?.addEventListener('click', () => applySectionOrderPreset(['summary', 'experience', 'skills', 'projects', 'education', 'certifications']));
-  btnOrderGraduate?.addEventListener('click', () => applySectionOrderPreset(['summary', 'skills', 'projects', 'education', 'experience', 'certifications']));
+  btnOrderSenior?.addEventListener('click', () => applySectionOrderPreset(['summary', 'experience', 'skills', 'projects', 'education', 'certifications', 'references']));
+  btnOrderGraduate?.addEventListener('click', () => applySectionOrderPreset(['summary', 'skills', 'projects', 'education', 'experience', 'certifications', 'references']));
   btnDismissAssistant?.addEventListener('click', () => {
     dismissedAssistantStates.add(currentBudgetState);
     if (officeAssistant) officeAssistant.hidden = true;

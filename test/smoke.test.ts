@@ -39,7 +39,11 @@ describe('Smoke Test Suite', () => {
     expect(stats.size).toBeGreaterThan(1000);
 
     const content = fs.readFileSync(FIXTURE_PATH, 'utf-8');
-    expect(content).toContain('Datanian');
+    expect(content).toContain('Acme Systems');
+    expect(content).not.toMatch(/Faris|Antoni|Datanian/i);
+    const resumeContent = fs.readFileSync(path.resolve(ROOT_DIR, 'fixtures/resume.json'), 'utf-8');
+    expect(resumeContent).toContain('Alex Morgan');
+    expect(resumeContent).not.toMatch(/Faris|Antoni|Datanian/i);
   });
 
   // SMOKE 2: End-to-End Extraction & 1-Page Regression
@@ -51,7 +55,7 @@ describe('Smoke Test Suite', () => {
     });
 
     expect(extraction.data).toBeDefined();
-    expect(extraction.data.basics.name).toBe('Muhd Faris Danish bin Antoni');
+    expect(extraction.data.basics.name).toBe('Alex Morgan');
     expect(extraction.data.basics.contact.phone).toBe('+65 9123 4567');
 
     // 2. Schema validation
@@ -61,7 +65,7 @@ describe('Smoke Test Suite', () => {
 
     // 3. Render HTML
     const html = renderResume(parsed.data);
-    expect(html).toContain('Muhd Faris Danish bin Antoni');
+    expect(html).toContain('Alex Morgan');
     expect(html).toContain('+65 9123 4567');
     expect(html).toContain('@font-face');
 
@@ -75,15 +79,30 @@ describe('Smoke Test Suite', () => {
   }, 30000);
 
   test('SMOKE 2B: Customized layout remains a strict single-page PDF', async () => {
-    const html = renderResume(resumeFixture, {
+    const phase9Fixture = {
+      ...resumeFixture,
+      basics: {
+        ...resumeFixture.basics,
+        headshot: {
+          dataUri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          shape: 'circle' as const,
+          position: 'right' as const,
+        },
+      },
+      references: { mode: 'available-on-request' as const },
+    };
+    const html = renderResume(phase9Fixture, {
       styleConfig: {
         fontPairing: 'modern',
         accentColor: '#1b4332',
         density: 'compact',
         margins: 'tight',
+        bodyAlignment: 'left',
+        headerAlignment: 'center',
+        sectionScale: { experience: 0.9, skills: 0.95, references: 0.9 },
       },
       headings: { EXPERIENCE: 'PROFESSIONAL EXPERIENCE', SKILLS: 'CORE SKILLS' },
-      sectionOrder: ['summary', 'skills', 'experience', 'projects', 'education', 'certifications'],
+      sectionOrder: ['summary', 'skills', 'experience', 'projects', 'education', 'certifications', 'references'],
     });
     const { buffer, pageCount, isSinglePage } = await generatePdf({ html });
 

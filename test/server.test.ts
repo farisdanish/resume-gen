@@ -53,7 +53,7 @@ describe('Server & Loopback Security Test', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.data.basics.name).toBe('Muhd Faris Danish bin Antoni');
+    expect(body.data.basics.name).toBe('Alex Morgan');
     expect(body.data.basics.contact.phone).toBe('+65 9123 4567');
   });
 
@@ -75,7 +75,7 @@ describe('Server & Loopback Security Test', () => {
     expect(previewRes.status).toBe(200);
     const previewBody = await previewRes.json();
     expect(previewBody.success).toBe(true);
-    expect(previewBody.html).toContain('Muhd Faris Danish bin Antoni');
+    expect(previewBody.html).toContain('Alex Morgan');
     expect(previewBody.html).toContain('@font-face');
   });
 
@@ -100,7 +100,7 @@ describe('Server & Loopback Security Test', () => {
         headings: {
           EXPERIENCE: 'WORK HISTORY',
         },
-        sectionOrder: ['summary', 'skills', 'projects', 'education', 'experience', 'certifications'],
+        sectionOrder: ['summary', 'skills', 'projects', 'education', 'experience', 'certifications', 'references'],
       }),
     });
 
@@ -134,6 +134,27 @@ describe('Server & Loopback Security Test', () => {
     expect(body.error).toBe('Invalid section order');
   });
 
+  test('POST /api/preview: Rejects invalid Phase 9 style values', async () => {
+    const extractRes = await fetch(`${BASE_URL}/api/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'fixture' }),
+    });
+    const { data } = await extractRes.json();
+    const previewRes = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume: data,
+        styleConfig: { bodyAlignment: 'center', sectionScale: { summary: 2 } },
+      }),
+    });
+
+    expect(previewRes.status).toBe(400);
+    const body = await previewRes.json();
+    expect(body.error).toBe('Invalid style configuration');
+  });
+
   test('POST /api/generate-pdf: Returns binary PDF with single page budget header', async () => {
     const extractRes = await fetch(`${BASE_URL}/api/extract`, {
       method: 'POST',
@@ -164,6 +185,10 @@ describe('Server & Loopback Security Test', () => {
     expect(html).toContain('Microsoft Resume 2000');
     // Enforce sandboxed iframe invariant
     expect(html).toContain('<iframe id="preview-frame" sandbox=""');
+    expect(html).toContain('id="select-body-alignment"');
+    expect(html).toContain('id="section-scale-controls"');
+    expect(html).toContain('id="select-references-mode"');
+    expect(html).toContain('id="input-headshot"');
   });
 
   test('GET /office2000.css & /app.js: Serves static assets', async () => {
@@ -177,4 +202,5 @@ describe('Server & Loopback Security Test', () => {
     const jsText = await jsRes.text();
     expect(jsText).toContain('previewFrame');
   });
+
 });

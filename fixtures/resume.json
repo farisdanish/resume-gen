@@ -1,22 +1,22 @@
 {
   "basics": {
-    "name": "Faris Antoni",
-    "title": "Software Engineer & System Architect",
-    "summary": "Experienced engineer specializing in high-efficiency distributed systems, full-stack architecture, and streamlined workflows.",
+    "name": "Alex Morgan",
+    "title": "Senior Full-Stack Engineer",
+    "summary": "Experienced engineer specializing in reliable distributed systems, accessible product experiences, and efficient delivery workflows.",
     "contact": {
-      "email": "contact@farisantoni.com",
-      "phone": "+1-555-0199",
-      "location": "Jakarta, Indonesia",
-      "github": "https://github.com/farisantoni",
-      "linkedin": "https://linkedin.com/in/farisantoni",
-      "website": "https://farisantoni.com"
+      "email": "alex.morgan@example.com",
+      "phone": "+1-555-0100",
+      "location": "Seattle, WA",
+      "github": "https://github.com/alexmorgan-example",
+      "linkedin": "https://linkedin.com/in/alexmorgan-example",
+      "website": "https://alexmorgan.example"
     }
   },
   "work": [
     {
       "role": "Senior Software Engineer",
-      "company": "Datanian Technologies",
-      "location": "Jakarta, Indonesia",
+      "company": "Acme Systems",
+      "location": "Seattle, WA",
       "start": "2024-03",
       "end": null,
       "highlights": [
@@ -26,7 +26,7 @@
     },
     {
       "role": "Software Engineer",
-      "company": "Tech Solutions Inc.",
+      "company": "Northstar Labs",
       "location": "Remote",
       "start": "2022-01",
       "end": "2024-02",
@@ -38,7 +38,7 @@
   ],
   "education": [
     {
-      "institution": "University of Indonesia",
+      "institution": "Example University",
       "degree": "B.S. in Computer Science",
       "start": "2018",
       "end": "2022",
@@ -60,10 +60,10 @@
   ],
   "projects": [
     {
-      "title": "Resume Gen",
-      "description": "Headless CLI and vintage desktop web app for ATS-compliant resume compilation.",
+      "title": "Profile Studio",
+      "description": "Headless CLI and desktop web app for accessible, ATS-compatible document compilation.",
       "stack": ["TypeScript", "Hono", "Playwright", "Handlebars"],
-      "link": "https://github.com/farisantoni/resume-gen"
+      "link": "https://github.com/alexmorgan-example/profile-studio"
     }
   ]
 }

@@ -7,10 +7,15 @@
 </head>
 <body>
   <div class="resume-page">
-    <header class="resume-header">
-      <h1 class="candidate-name">{{basics.name}}</h1>
-      <div class="candidate-title">{{basics.title}}</div>
-      <div class="contact-bar">
+    <header class="resume-header {{#if basics.headshot}}has-headshot headshot-{{basics.headshot.position}}{{/if}}">
+      <div class="header-layout">
+        {{#if basics.headshot}}
+        <img class="headshot headshot-{{basics.headshot.shape}}" src="{{basics.headshot.dataUri}}" alt="">
+        {{/if}}
+        <div class="header-copy">
+          <h1 class="candidate-name">{{basics.name}}</h1>
+          <div class="candidate-title">{{basics.title}}</div>
+          <div class="contact-bar">
         {{#if basics.contact.email}}
           <span class="contact-item"><a href="mailto:{{basics.contact.email}}">{{basics.contact.email}}</a></span>
         {{/if}}
@@ -34,13 +39,15 @@
           <span class="contact-sep">•</span>
           <span class="contact-item"><a href="{{basics.contact.website}}">Website</a></span>
         {{/if}}
+          </div>
+        </div>
       </div>
     </header>
 
     {{#each orderedSections}}
     {{#if isSummary}}
     {{#if resume.basics.summary}}
-    <section class="section">
+    <section class="section section-summary">
       <h2 class="section-heading">{{headings.SUMMARY}}</h2>
       <p class="summary-text">{{resume.basics.summary}}</p>
     </section>
@@ -49,7 +56,7 @@
 
     {{#if isExperience}}
     {{#if resume.work.length}}
-    <section class="section">
+    <section class="section section-experience">
       <h2 class="section-heading">{{headings.EXPERIENCE}}</h2>
       {{#each resume.work}}
       <div class="experience-item">
@@ -77,7 +84,7 @@
 
     {{#if isEducation}}
     {{#if resume.education.length}}
-    <section class="section">
+    <section class="section section-education">
       <h2 class="section-heading">{{headings.EDUCATION}}</h2>
       {{#each resume.education}}
       <div class="education-item">
@@ -97,7 +104,7 @@
 
     {{#if isSkills}}
     {{#if resume.skills.length}}
-    <section class="section">
+    <section class="section section-skills">
       <h2 class="section-heading">{{headings.SKILLS}}</h2>
       {{#each resume.skills}}
       <div class="skill-category-row">
@@ -113,7 +120,7 @@
 
     {{#if isCertifications}}
     {{#if resume.certifications.length}}
-    <section class="section">
+    <section class="section section-certifications">
       <h2 class="section-heading">{{headings.CERTIFICATIONS}}</h2>
       <div class="certs-inline">
         {{#each resume.certifications}}{{this}}{{#unless @last}} • {{/unless}}{{/each}}
@@ -124,7 +131,7 @@
 
     {{#if isProjects}}
     {{#if resume.projects.length}}
-    <section class="section">
+    <section class="section section-projects">
       <h2 class="section-heading">{{headings.PROJECTS}}</h2>
       {{#each resume.projects}}
       <div class="project-item">
@@ -136,6 +143,31 @@
         <p class="project-desc">{{this.description}}</p>
       </div>
       {{/each}}
+    </section>
+    {{/if}}
+    {{/if}}
+
+    {{#if isReferences}}
+    {{#if resume.references}}
+    <section class="section section-references">
+      <h2 class="section-heading">{{headings.REFERENCES}}</h2>
+      {{#if resume.references.entries}}
+      <div class="references-grid">
+        {{#each resume.references.entries}}
+        <div class="reference-item">
+          <span class="reference-name">{{this.name}}</span>
+          {{#if this.title}}<span> — {{this.title}}</span>{{/if}}
+          {{#if this.organization}}<span>, {{this.organization}}</span>{{/if}}
+          <div class="reference-contact">
+            {{#if this.email}}{{this.email}}{{/if}}
+            {{#if this.phone}}{{#if this.email}} • {{/if}}{{this.phone}}{{/if}}
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <p class="references-request">References available upon request.</p>
+      {{/if}}
     </section>
     {{/if}}
     {{/if}}

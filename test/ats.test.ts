@@ -52,9 +52,23 @@ describe('ATS Validation Test', () => {
       EDUCATION: 'ACADEMIC BACKGROUND',
       EXPERIENCE: 'PROFESSIONAL EXPERIENCE',
       CERTIFICATIONS: 'CREDENTIALS',
+      REFERENCES: 'REFERENCES',
     };
-    const order = ['summary', 'skills', 'projects', 'education', 'experience', 'certifications'] as const;
-    const html = renderResume(resumeFixture, { headings, sectionOrder: [...order] });
+    const order = ['summary', 'skills', 'projects', 'education', 'experience', 'certifications', 'references'] as const;
+    const resumeWithReferences = {
+      ...resumeFixture,
+      references: {
+        mode: 'entries' as const,
+        entries: [{
+          name: 'Jordan Lee',
+          title: 'Engineering Director',
+          organization: 'Example Industries',
+          email: 'jordan.lee@example.com',
+          phone: '+1-555-0101',
+        }],
+      },
+    };
+    const html = renderResume(resumeWithReferences, { headings, sectionOrder: [...order] });
     const { buffer, pageCount } = await generatePdf({ html });
     expect(pageCount).toBe(1);
 
@@ -67,11 +81,14 @@ describe('ATS Validation Test', () => {
       education: headings.EDUCATION,
       experience: headings.EXPERIENCE,
       certifications: headings.CERTIFICATIONS,
+      references: headings.REFERENCES,
     }[key]));
 
     positions.forEach((position) => expect(position).toBeGreaterThan(-1));
     for (let index = 1; index < positions.length; index += 1) {
       expect(positions[index]).toBeGreaterThan(positions[index - 1]);
     }
+    expect(text.replace(/\s+/g, '')).toContain('JordanLee');
+    expect(text).toContain('jordan.lee@example.com');
   }, 30000);
 });

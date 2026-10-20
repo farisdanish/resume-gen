@@ -115,7 +115,7 @@ export async function runExtraction(opts: ExtractOptions): Promise<ExtractResult
   const linkedin = linkedinHref?.trim();
 
   const canonicalHref = $('link[rel="canonical"]').attr('href') || $('meta[property="og:url"]').attr('content');
-  const website = canonicalHref?.trim() || (isUrl ? targetUrl : 'https://farisantoni.com');
+  const website = canonicalHref?.trim() || (isUrl ? targetUrl : 'https://alexmorgan.example');
 
   const contact: any = {
     email,

@@ -582,6 +582,57 @@ html, body {
   font-weight: bold;
 }
 
+.headshot-editor {
+  padding-top: 6px;
+  border-top: 1px solid #b8b8b8;
+}
+
+.headshot-control-row,
+.headshot-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.headshot-control-row > * { flex: 1; }
+
+.headshot-preview {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid #808080;
+  background: #fff;
+}
+
+.reference-editor-card {
+  margin-bottom: 6px;
+  padding: 6px;
+  border: 1px solid #808080;
+  background: #fff;
+}
+
+.reference-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.section-scale-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.section-scale-row {
+  display: grid;
+  grid-template-columns: 1fr 82px;
+  align-items: center;
+  gap: 5px;
+}
+
 
 /* Fieldsets and Panels */
 .win-fieldset {

@@ -9,11 +9,11 @@ describe('DOM Extractor against Fixture', () => {
       phoneOverride: '+60-12-345-6789',
     });
 
-    expect(data.basics.name).toContain('Faris');
+    expect(data.basics.name).toBe('Alex Morgan');
     expect(data.basics.contact.phone).toBe('+60-12-345-6789');
     expect(data.basics.contact.email).toContain('@');
     expect(data.work.length).toBeGreaterThanOrEqual(1);
-    expect(data.work[0].company).toContain('Datanian');
+    expect(data.work[0].company).toContain('Acme Systems');
     expect(data.education.length).toBeGreaterThanOrEqual(1);
     expect(data.skills.length).toBeGreaterThanOrEqual(1);
 
