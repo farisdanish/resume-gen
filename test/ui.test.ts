@@ -51,6 +51,150 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('isolates named profiles, confirms dirty switches, and restores a saved PDF after reload', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      expect(await page.locator('#profile-name').count()).toBe(1);
+      await page.locator('#profile-name').fill('Backend Engineer');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Saved Backend Engineer.');
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#edit-title').fill('Full-Stack Developer');
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('Full-Stack Developer');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Saved Full-Stack Developer.');
+      const library = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!));
+      expect(library.profiles.length).toBe(2);
+      const backend = library.profiles.find((entry: any) => entry.name === 'Backend Engineer');
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#edit-title').fill('Unsaved draft');
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#saved-profile-list').selectOption(backend.id);
+      page.once('dialog', (dialog) => dialog.dismiss());
+      await page.locator('#btn-load-named-profile').click();
+      expect(await page.locator('#edit-title').inputValue()).toBe('Unsaved draft');
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.locator('#btn-load-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Loaded Backend Engineer.');
+      expect(await page.locator('#edit-title').inputValue()).not.toBe('Unsaved draft');
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#saved-profile-list option').count()).toBe(3);
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.texts.unpdf).not.toContain('Unsaved draft');
+      const after = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!));
+      expect(after.profiles.find((entry: any) => entry.name === 'Full-Stack Developer').bundle.draftResume.basics.title).toBe('Full-Stack Developer');
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('requires explicit update for duplicate profile names and preserves data on storage failure', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      expect(await page.locator('#profile-name').count()).toBe(1);
+      await page.locator('#profile-name').fill('Backend Engineer');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Saved Backend Engineer.');
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#edit-title').fill('Updated backend title');
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('backend engineer');
+      await page.locator('#btn-save-named-profile').click();
+      expect(await page.locator('#profile-library-message').textContent()).toContain('Update Saved Profile');
+      const savedTitle = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].bundle.draftResume.basics.title);
+      expect(savedTitle).not.toBe('Updated backend title');
+      await page.locator('#btn-update-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent?.startsWith('Updated '));
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].bundle.draftResume.basics.title)).toBe('Updated backend title');
+      const before = await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'));
+      await page.evaluate(() => {
+        const setItem = Storage.prototype.setItem;
+        Storage.prototype.setItem = function(key, value) {
+          if (key === 'resume_gen_profiles_v1') throw new DOMException('Full', 'QuotaExceededError');
+          return setItem.call(this, key, value);
+        };
+      });
+      await page.locator('#profile-name').fill('Another profile');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent?.includes('Could not save'));
+      expect(await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'))).toBe(before);
+      expect(await page.locator('#edit-title').inputValue()).toBe('Updated backend title');
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('leaves the active draft intact when the named-profile library is corrupt', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.evaluate(() => localStorage.setItem('resume_gen_profiles_v1', '{broken'));
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#profile-library-message').count()).toBe(1);
+      expect(await page.locator('#profile-library-message').textContent()).toContain('unavailable');
+      expect(await page.locator('#btn-save-named-profile').isDisabled()).toBe(true);
+      expect(await page.locator('#edit-name').inputValue()).not.toBe('');
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('still confirms unsaved named-profile changes after reloading the browser', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('#profile-name').fill('Backend Engineer');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Saved Backend Engineer.');
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#edit-title').fill('Unsaved after reload');
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      const id = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].id);
+      await page.locator('#saved-profile-list').selectOption(id);
+      page.once('dialog', (dialog) => dialog.dismiss());
+      await page.locator('#btn-load-named-profile').click();
+      await page.waitForFunction(() => !(document.getElementById('btn-load-named-profile') as HTMLButtonElement)?.disabled);
+      expect(await page.locator('#edit-title').inputValue()).toBe('Unsaved after reload');
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('round-trips named-profile settings and visibility through a portable profile without rewriting the library', async () => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      await page.locator('.chk-proj-include').first().uncheck();
+      await page.locator('#select-references-mode').selectOption('none');
+      await page.locator('#input-headshot').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') });
+      await page.locator('#headshot-preview').waitFor({ state: 'visible' });
+      await page.locator('[data-tab="tab-design"]').click();
+      await page.locator('#select-date-format').selectOption('month-name');
+      await page.locator('#select-page-target').selectOption('2');
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('Sabah Software Engineer');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Saved Sabah Software Engineer.');
+      const before = await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'));
+      const portable = await downloadedBytes(page, '#btn-export-json');
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('.chk-proj-include').first().check();
+      await page.locator('#chk-headshot-include').uncheck();
+      await page.locator('#edit-title').fill('Temporary title');
+      await page.locator('#input-import-json').setInputFiles({ name: 'saved.json', mimeType: 'application/json', buffer: portable });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Restored complete tailored profile'));
+      expect(await page.locator('#chk-headshot-include').isChecked()).toBe(true);
+      expect(await page.locator('.chk-proj-include').first().isChecked()).toBe(false);
+      expect(await page.locator('#select-date-format').inputValue()).toBe('month-name');
+      expect(await page.locator('#select-page-target').inputValue()).toBe('2');
+      expect(await page.locator('#select-references-mode').inputValue()).toBe('none');
+      expect(await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'))).toBe(before);
+      await page.locator('[data-tab="tab-source"]').click();
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.texts.unpdf).toContain('Second Project');
+      expect(pdf.texts.unpdf).not.toContain('Temporary title');
+      expect(pdf.urls).not.toContain(resumeFixture.projects[0].link);
+    } finally { await page.close(); }
+  }, 30000);
+
   it('round-trips date display and page targets while preserving canonical dates', async () => {
     const page = await browser.newPage();
     try {

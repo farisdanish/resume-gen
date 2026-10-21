@@ -173,6 +173,21 @@
               </div>
             </fieldset>
 
+            <fieldset class="win-fieldset named-profile-editor">
+              <legend class="win-legend">Saved Profiles</legend>
+              <label class="form-label" for="profile-name">Profile name:</label>
+              <input id="profile-name" class="win-input" type="text" maxlength="80" list="profile-name-suggestions">
+              <datalist id="profile-name-suggestions"><option value="Backend Engineer"><option value="Full-Stack Developer"><option value="Sabah Software Engineer"></datalist>
+              <button type="button" id="btn-save-named-profile" class="win-button">Save Current</button>
+              <label class="form-label" for="saved-profile-list">Saved in this browser:</label>
+              <select id="saved-profile-list" class="win-input"><option value="">Choose a saved profile…</option></select>
+              <div class="named-profile-actions">
+                <button type="button" id="btn-load-named-profile" class="win-button" disabled>Load</button>
+                <button type="button" id="btn-update-named-profile" class="win-button" disabled>Update Saved Profile</button>
+              </div>
+              <p id="profile-library-message" aria-live="polite">Name and save your own tailored content. Profiles stay in this browser.</p>
+            </fieldset>
+
             <fieldset class="win-fieldset budget-guard" aria-labelledby="budget-label">
               <legend class="win-legend">Page Budget Guard</legend>
               <div class="budget-label-row">

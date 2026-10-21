@@ -921,3 +921,8 @@ html, body {
 .badge-ok { color: #007000; }
 .badge-warn { color: #b05000; }
 .badge-error { color: #b00000; }
+
+.named-profile-editor { display: flex; flex-direction: column; gap: 5px; }
+.named-profile-editor .win-input { width: 100%; min-width: 0; }
+.named-profile-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+#profile-library-message { font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }

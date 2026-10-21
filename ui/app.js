@@ -345,21 +345,167 @@
     });
   });
 
+  // Named snapshots use a separate storage key from the continuously saved draft.
+  const PROFILE_LIBRARY_KEY = 'resume_gen_profiles_v1';
+  const profileName = document.getElementById('profile-name');
+  const profileList = document.getElementById('saved-profile-list');
+  const saveNamedButton = document.getElementById('btn-save-named-profile');
+  const updateNamedButton = document.getElementById('btn-update-named-profile');
+  const loadNamedButton = document.getElementById('btn-load-named-profile');
+  const libraryMessage = document.getElementById('profile-library-message');
+  let libraryAvailable = true;
+  let libraryBusy = false;
+  let savedNamedSnapshot = null;
+
+  function currentProfileBundle() {
+    return JSON.parse(JSON.stringify({ version: PROFILE_VERSION, draftResume, visibility, styleConfig,
+      sectionHeadings, sectionOrder, pageTarget, savedAt: new Date().toISOString() }));
+  }
+
+  function profileFingerprint(bundle) {
+    const { savedAt, version, isLegacy, ...content } = bundle;
+    return JSON.stringify(content);
+  }
+
+  function applyProfile(profile) {
+    draftResume = profile.draftResume;
+    visibility = profile.visibility;
+    styleConfig = profile.styleConfig;
+    sectionHeadings = profile.sectionHeadings;
+    sectionOrder = profile.sectionOrder;
+    pageTarget = profile.pageTarget;
+  }
+
+  function refreshLibraryButtons() {
+    saveNamedButton.disabled = !libraryAvailable || libraryBusy;
+    updateNamedButton.disabled = !libraryAvailable || libraryBusy || !profileList.value;
+    loadNamedButton.disabled = !libraryAvailable || libraryBusy || !profileList.value;
+  }
+
+  function readProfileLibrary() {
+    const raw = localStorage.getItem(PROFILE_LIBRARY_KEY);
+    if (!raw) return { version: 1, profiles: [] };
+    const library = JSON.parse(raw);
+    if (library?.version !== 1 || !Array.isArray(library.profiles)) throw new Error('Invalid saved-profile library');
+    const names = new Set();
+    const ids = new Set();
+    for (const entry of library.profiles) {
+      if (!entry || typeof entry.id !== 'string' || !entry.id || ids.has(entry.id)
+        || typeof entry.name !== 'string' || !entry.name.trim() || entry.name !== entry.name.trim() || entry.name.length > 80
+        || names.has(entry.name.trim().toLowerCase())) throw new Error('Invalid saved-profile entry');
+      parseImportedProfile(entry.bundle);
+      names.add(entry.name.trim().toLowerCase());
+      ids.add(entry.id);
+    }
+    return library;
+  }
+
+  function populateProfileLibrary(selected = profileList.value) {
+    try {
+      const library = readProfileLibrary();
+      profileList.replaceChildren(new Option('Choose a saved profile…', ''));
+      for (const entry of library.profiles) profileList.add(new Option(entry.name, entry.id));
+      profileList.value = selected;
+      libraryAvailable = true;
+    } catch {
+      libraryAvailable = false;
+      libraryMessage.textContent = 'Saved profiles unavailable: the library could not be read. Your active draft is unchanged.';
+    }
+    refreshLibraryButtons();
+  }
+
+  async function saveNamedProfile(update = false) {
+    if (libraryBusy || !libraryAvailable || !draftResume) return;
+    const name = profileName.value.trim();
+    if (!name || name.length > 80) {
+      libraryMessage.textContent = 'Enter a profile name of 1–80 characters.';
+      return;
+    }
+    libraryBusy = true;
+    refreshLibraryButtons();
+    try {
+      const library = readProfileLibrary();
+      const selected = library.profiles.find((entry) => entry.id === profileList.value);
+      const duplicate = library.profiles.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+      if (!update && duplicate) {
+        populateProfileLibrary(duplicate.id);
+        libraryMessage.textContent = 'This name already exists. Use Update Saved Profile to replace it.';
+        return;
+      }
+      if (update && (!selected || (duplicate && duplicate.id !== selected.id))) {
+        libraryMessage.textContent = 'Select the profile to update and use a unique name.';
+        return;
+      }
+      const previousLibrary = localStorage.getItem(PROFILE_LIBRARY_KEY);
+      const bundle = currentProfileBundle();
+      await validateImportedProfile(parseImportedProfile(bundle));
+      if (localStorage.getItem(PROFILE_LIBRARY_KEY) !== previousLibrary) throw new Error('Saved profiles changed in another tab; retry');
+      const entry = { id: update ? selected.id : crypto.randomUUID(), name, bundle };
+      const profiles = update ? library.profiles.map((item) => item.id === selected.id ? entry : item) : [...library.profiles, entry];
+      localStorage.setItem(PROFILE_LIBRARY_KEY, JSON.stringify({ version: 1, profiles }));
+      savedNamedSnapshot = profileFingerprint(bundle);
+      populateProfileLibrary(entry.id);
+      libraryMessage.textContent = `${update ? 'Updated' : 'Saved'} ${name}.`;
+    } catch (error) {
+      libraryMessage.textContent = `Could not save profile: ${error.message}. Your draft and saved profiles are unchanged.`;
+    } finally {
+      libraryBusy = false;
+      refreshLibraryButtons();
+    }
+  }
+
+  async function loadNamedProfile() {
+    if (libraryBusy || !libraryAvailable || !draftResume) return;
+    libraryBusy = true;
+    refreshLibraryButtons();
+    try {
+      const entry = readProfileLibrary().profiles.find((item) => item.id === profileList.value);
+      if (!entry) throw new Error('Choose a saved profile');
+      const before = profileFingerprint(currentProfileBundle());
+      if (!saveStateToStorage()) throw new Error('Could not save the current browser draft');
+      if (savedNamedSnapshot !== null && before !== savedNamedSnapshot
+        && !confirm('Load this saved profile? This replaces your current edits. Download Save Profile first to keep a portable copy.')) return;
+      const profile = parseImportedProfile(structuredClone(entry.bundle));
+      await validateImportedProfile(profile);
+      if (before !== profileFingerprint(currentProfileBundle())) throw new Error('The draft changed while loading; retry');
+      // Persist the replacement before mutating the active state, so quota errors cannot discard it.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...profile, version: PROFILE_VERSION, savedAt: new Date().toISOString() }));
+      applyProfile(profile);
+      savedNamedSnapshot = profileFingerprint(currentProfileBundle());
+      profileName.value = entry.name;
+      populateContentForm();
+      await renderPreview();
+      libraryMessage.textContent = `Loaded ${entry.name}.`;
+    } catch (error) {
+      libraryMessage.textContent = `Could not load profile: ${error.message}. Your active draft is unchanged.`;
+    } finally {
+      libraryBusy = false;
+      refreshLibraryButtons();
+    }
+  }
+
+  saveNamedButton.addEventListener('click', () => saveNamedProfile());
+  updateNamedButton.addEventListener('click', () => saveNamedProfile(true));
+  loadNamedButton.addEventListener('click', loadNamedProfile);
+  profileList.addEventListener('change', () => {
+    try {
+      const entry = readProfileLibrary().profiles.find((item) => item.id === profileList.value);
+      if (entry) profileName.value = entry.name;
+      refreshLibraryButtons();
+    } catch { populateProfileLibrary(); }
+  });
+  window.addEventListener('storage', (event) => {
+    if (event.key === PROFILE_LIBRARY_KEY) populateProfileLibrary();
+  });
+
   // --- Storage & State Management ---
   function saveStateToStorage() {
     try {
-      const bundle = {
-        draftResume,
-        visibility,
-        styleConfig,
-        sectionHeadings,
-        sectionOrder,
-        pageTarget,
-        savedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(bundle));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentProfileBundle()));
+      return true;
     } catch {
-      // Ignore quota errors
+      libraryMessage.textContent = 'Could not save browser draft. Download Save Profile to keep a copy.';
+      return false;
     }
   }
 
@@ -368,26 +514,15 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return false;
       const bundle = JSON.parse(raw);
-      if (bundle && bundle.draftResume) {
-        draftResume = bundle.draftResume;
-        visibility = { ...visibility, ...(bundle.visibility || {}) };
-        visibility.contact = { ...visibility.contact, ...(bundle.visibility?.contact || {}) };
-        styleConfig = {
-          ...styleConfig,
-          ...(bundle.styleConfig || {}),
-          sectionScale: { ...(bundle.styleConfig?.sectionScale || {}) },
-        };
-        sectionHeadings = { ...sectionHeadings, ...(bundle.sectionHeadings || {}) };
-        sectionOrder = normalizeSectionOrder(bundle.sectionOrder);
-        if (![1, 2].includes(bundle.pageTarget ?? 1)) throw new Error('Invalid saved page target');
-        pageTarget = bundle.pageTarget ?? 1;
-        styleConfig.dateFormat = styleConfig.dateFormat || 'iso';
-        return true;
-      }
-    } catch (e) {
-      log(`Storage load failed: ${e.message}`, 'warn');
+      if (!bundle?.draftResume) return false;
+      const profile = parseImportedProfile({ ...bundle, version: PROFILE_VERSION,
+        sectionOrder: normalizeSectionOrder(bundle.sectionOrder) });
+      applyProfile(profile);
+      return true;
+    } catch (error) {
+      log(`Storage load failed: ${error.message}`, 'warn');
+      return false;
     }
-    return false;
   }
 
   function scheduleDebouncedPreview() {
@@ -1268,6 +1403,15 @@
       }
 
       populateContentForm();
+      if (savedNamedSnapshot === null) {
+        const current = profileFingerprint(currentProfileBundle());
+        savedNamedSnapshot = current;
+        try {
+          const profiles = readProfileLibrary().profiles;
+          // An unmatched restored draft must still be treated as dirty after a reload.
+          if (profiles.length && !profiles.some(({ bundle }) => profileFingerprint(parseImportedProfile(bundle)) === current)) savedNamedSnapshot = '';
+        } catch { /* The corrupt library stays unavailable; the active draft remains usable. */ }
+      }
       await renderPreview();
     } catch (err) {
       log(`Extraction network error: ${err.message}`, 'error');
@@ -1584,12 +1728,8 @@
         const parsed = JSON.parse(event.target.result);
         const profile = parseImportedProfile(parsed);
         await validateImportedProfile(profile);
-        draftResume = profile.draftResume;
-        visibility = profile.visibility;
-        styleConfig = profile.styleConfig;
-        sectionHeadings = profile.sectionHeadings;
-        sectionOrder = profile.sectionOrder;
-        pageTarget = profile.pageTarget;
+        applyProfile(profile);
+        savedNamedSnapshot = profileFingerprint(currentProfileBundle());
         saveStateToStorage();
         populateContentForm();
         await renderPreview();
@@ -1673,6 +1813,7 @@
     statusHost.textContent = window.location.host;
   }
   if (chkOfficeAssistant) chkOfficeAssistant.checked = localStorage.getItem(ASSISTANT_KEY) !== 'false';
+  populateProfileLibrary();
   applyZoom();
   extractData();
 })();
