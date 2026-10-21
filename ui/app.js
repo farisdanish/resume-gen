@@ -739,9 +739,32 @@
             <input type="checkbox" class="chk-proj-include" data-idx="${projIdx}" ${isIncluded ? 'checked' : ''}>
             <span><b>${escapeHtml(proj.title || '')}</b></span>
           </label>
+          <label class="form-label" for="project-description-${projIdx}">Description:</label>
+          <textarea id="project-description-${projIdx}" class="win-textarea input-project-description" rows="3"
+            aria-describedby="project-description-error-${projIdx}"></textarea>
+          <div id="project-description-error-${projIdx}" role="alert" hidden>
+            Enter a description before including this project.
+          </div>
         `;
+        const description = div.querySelector('.input-project-description');
+        const descriptionError = div.querySelector(`#project-description-error-${projIdx}`);
+        description.value = proj.description || '';
+        const updateValidation = () => {
+          const included = visibility.projects[projIdx] !== false;
+          const invalid = included && !description.value.trim();
+          description.required = included;
+          description.setAttribute('aria-invalid', String(invalid));
+          descriptionError.hidden = !invalid;
+        };
+        updateValidation();
+        description.addEventListener('input', (e) => {
+          proj.description = e.target.value;
+          updateValidation();
+          scheduleDebouncedPreview();
+        });
         div.querySelector('.chk-proj-include').addEventListener('change', (e) => {
           visibility.projects[projIdx] = e.target.checked;
+          updateValidation();
           scheduleDebouncedPreview();
         });
         projItemsContainer.appendChild(div);
@@ -1153,6 +1176,15 @@
     }
   }
 
+  function validateProjectDescriptions(resume) {
+    if ((resume.projects || []).some((project) => !project.description?.trim())) {
+      setBudgetUnavailable('Budget unavailable — preview is out of date');
+      setStatus('Project description required', 'Not measured');
+      return false;
+    }
+    return true;
+  }
+
   async function renderPreview() {
     const payload = buildPayload();
     if (!payload) {
@@ -1162,6 +1194,7 @@
 
     if (debounceTimer) clearTimeout(debounceTimer);
     invalidatePreview();
+    if (!validateProjectDescriptions(payload)) return;
     const revision = previewRevision;
     const controller = new AbortController();
     previewController = controller;
@@ -1226,6 +1259,7 @@
       log('Cannot export: No resume data loaded.', 'warn');
       return;
     }
+    if (!validateProjectDescriptions(payload)) return;
 
     try {
       setStatus('Generating Playwright PDF (Strict A4)...');
