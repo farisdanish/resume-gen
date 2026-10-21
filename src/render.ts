@@ -14,6 +14,20 @@ function loadBase64Font(filename: string): string {
   return fs.readFileSync(path.join(FONTS_DIR, filename)).toString('base64');
 }
 
+// Keep short numeric ranges as one text run; escape all user-authored content.
+function resumeText(value: unknown): Handlebars.SafeString {
+  const text = String(value ?? '');
+  const range = /\b\d{1,6}(?:\.\d{1,3})?[-–]\d{1,6}(?:\.\d{1,3})?%/g;
+  let html = '';
+  let offset = 0;
+  for (const match of text.matchAll(range)) {
+    html += Handlebars.escapeExpression(text.slice(offset, match.index));
+    html += `<span class="numeric-range">${Handlebars.escapeExpression(match[0])}</span>`;
+    offset = match.index! + match[0].length;
+  }
+  return new Handlebars.SafeString(html + Handlebars.escapeExpression(text.slice(offset)));
+}
+
 export interface RenderOptions {
   styleConfig?: StyleConfigInput;
   headings?: Record<string, string>;
@@ -24,25 +38,25 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   const fontCss = `
     @font-face {
       font-family: 'ResumeSans';
-      src: url('data:font/woff2;base64,${loadBase64Font('Inter-Regular.woff2')}') format('woff2');
+      src: url('data:font/ttf;base64,${loadBase64Font('LiberationSans-Regular.ttf')}') format('truetype');
       font-weight: 400;
       font-style: normal;
     }
     @font-face {
       font-family: 'ResumeSans';
-      src: url('data:font/woff2;base64,${loadBase64Font('Inter-Bold.woff2')}') format('woff2');
+      src: url('data:font/ttf;base64,${loadBase64Font('LiberationSans-Bold.ttf')}') format('truetype');
       font-weight: 700;
       font-style: normal;
     }
     @font-face {
       font-family: 'ResumeSerif';
-      src: url('data:font/woff2;base64,${loadBase64Font('SourceSerif4-Regular.woff2')}') format('woff2');
+      src: url('data:font/ttf;base64,${loadBase64Font('LiberationSerif-Regular.ttf')}') format('truetype');
       font-weight: 400;
       font-style: normal;
     }
     @font-face {
       font-family: 'ResumeSerif';
-      src: url('data:font/woff2;base64,${loadBase64Font('SourceSerif4-Bold.woff2')}') format('woff2');
+      src: url('data:font/ttf;base64,${loadBase64Font('LiberationSerif-Bold.ttf')}') format('truetype');
       font-weight: 700;
       font-style: normal;
     }
@@ -144,5 +158,5 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
     headings: resolvedHeadings,
     orderedSections,
     inlinedStyles: `<style>${fontCss}\n${userStyles}\n${dynamicOverrides}</style>`,
-  });
+  }, { helpers: { resumeText } });
 }

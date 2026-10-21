@@ -147,6 +147,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 /* Summary */
+.numeric-range { white-space: nowrap; }
 .summary-text {
   font-size: var(--font-base-size);
   line-height: var(--line-height-base);

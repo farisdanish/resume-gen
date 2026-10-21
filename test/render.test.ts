@@ -3,6 +3,15 @@ import { renderResume } from '../src/render';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Template & Render Engine', () => {
+  it('keeps percentage ranges intact without interpreting description markup', () => {
+    const html = renderResume({ ...resumeFixture, basics: { ...resumeFixture.basics,
+      summary: 'Improved 80–90% and 80-90% <img src=x onerror=alert(1)>',
+    } });
+    expect(html).toContain('<span class="numeric-range">80–90%</span>');
+    expect(html).toContain('<span class="numeric-range">80-90%</span>');
+    expect(html).toContain('&lt;img');
+    expect(html).not.toContain('<img src=x');
+  });
   it('compiles HTML with inlined fonts and template sections', () => {
     const html = renderResume(resumeFixture);
 
@@ -10,7 +19,7 @@ describe('Template & Render Engine', () => {
     expect(html).toContain(resumeFixture.basics.name);
     expect(html).toContain('ResumeSans');
     expect(html).toContain('ResumeSerif');
-    expect(html).toContain('data:font/woff2;base64,');
+    expect(html).toContain('data:font/ttf;base64,');
     expect(html).toContain(resumeFixture.work[0].company);
     expect(html).toContain(resumeFixture.education[0].institution);
   });

@@ -1,0 +1,87 @@
+{
+  "basics": {
+    "name": "Alex Morgan",
+    "title": "Software Engineer",
+    "summary": "Backend Software Engineer with production Laravel, MongoDB and PostgreSQL experience in Kota Kinabalu. Improved performance by 80–90% and 80-90% using PHP↔Python (interop).",
+    "contact": {
+      "email": "alex.morgan@example.com",
+      "phone": "+60 10 1234567",
+      "location": "Seattle, WA",
+      "github": "https://github.com/alexmorgan-example",
+      "linkedin": "https://linkedin.com/in/alexmorgan-example",
+      "website": "https://alexmorgan.example"
+    }
+  },
+  "work": [
+    {
+      "role": "Software Engineer",
+      "company": "Alpha Systems",
+      "location": "Seattle, WA",
+      "start": "2024-12",
+      "end": null,
+      "highlights": [
+        "Reduced production delays by 80–90% using MongoDB and PostgreSQL (PHP↔Python)."
+      ]
+    },
+    {
+      "role": "Platform Engineer",
+      "company": "Beta Labs",
+      "location": "Remote",
+      "start": "2023-03",
+      "end": "2024-08",
+      "highlights": [
+        "Optimized database queries and built fault-tolerant event processing pipelines.",
+        "Refactored legacy modules into modular components, improving test efficiency."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "Example University",
+      "degree": "B.S. in Computer Science",
+      "start": "2018",
+      "end": "2022",
+      "type": "Undergraduate"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Languages & Core",
+      "items": [
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Go",
+        "SQL",
+        "HTML/CSS"
+      ]
+    },
+    {
+      "category": "Frameworks & Tools",
+      "items": [
+        "Node.js",
+        "Hono",
+        "React",
+        "Playwright",
+        "Docker",
+        "Git"
+      ]
+    }
+  ],
+  "certifications": [
+    "AWS Certified Solutions Architect"
+  ],
+  "projects": [
+    {
+      "title": "Evidence Project",
+      "description": "Project sentinel: reliable production processing.",
+      "stack": [
+        "TypeScript",
+        "Hono",
+        "Playwright",
+        "Handlebars"
+      ],
+      "link": "https://example.com/evidence"
+    }
+  ]
+}
