@@ -104,12 +104,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .contact-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8pt;
+  display: block;
   font-size: calc(var(--font-base-size) * 8 / 8.5);
   color: #4a5568;
-  justify-content: var(--header-align);
+  overflow-wrap: anywhere;
 }
 
 .contact-item a {
@@ -147,13 +145,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 /* Summary */
-.numeric-range { white-space: nowrap; }
+.numeric-range, .text-compound { white-space: nowrap; }
 .summary-text {
   font-size: var(--font-base-size);
   line-height: var(--line-height-base);
   color: #2d3748;
   text-align: var(--body-align);
-  hyphens: auto;
+  hyphens: none;
   overflow-wrap: break-word;
 }
 
@@ -209,7 +207,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   color: #2d3748;
   margin-bottom: 1.5pt;
   text-align: var(--body-align);
-  hyphens: auto;
+  hyphens: none;
+  overflow-wrap: break-word;
 }
 
 /* Education */
@@ -283,7 +282,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   font-size: calc(var(--font-base-size) * 8.2 / 8.5);
   color: #4a5568;
   text-align: var(--body-align);
-  hyphens: auto;
+  hyphens: none;
+  overflow-wrap: break-word;
 }
 
 /* References */
@@ -305,9 +305,46 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Keep profile links on their own predictable row, independent of identity wrapping. */
 .contact-identity .contact-item { min-width: 0; overflow-wrap: anywhere; }
-.contact-item + .contact-item::before { content: '•'; color: #cbd5e0; margin-right: 8pt; }
-.contact-links { flex-wrap: nowrap; margin-top: 3pt; }
+.contact-links { margin-top: 3pt; }
 .contact-links:empty { display: none; }
-.contact-links .contact-item { white-space: nowrap; }
 .project-link { font-size: calc(var(--font-base-size) * 8 / 8.5); overflow-wrap: anywhere; }
 .project-link a { color: #4a5568; text-decoration: underline; }
+
+/* Readable sizing is explicit; legacy density and zoom keep their original contract. */
+.readable-layout .section { margin-bottom: var(--section-gap); }
+.readable-layout .candidate-title { font-size: 12pt; }
+.readable-layout .contact-bar,
+.readable-layout .item-meta,
+.readable-layout .edu-meta,
+.readable-layout .project-link { font-size: var(--font-aux-size); color: #4a5568; }
+.readable-layout .summary-text,
+.readable-layout .item-role,
+.readable-layout .item-company,
+.readable-layout .highlight-list li,
+.readable-layout .edu-degree,
+.readable-layout .edu-institution,
+.readable-layout .skill-category-row,
+.readable-layout .certs-inline,
+.readable-layout .project-title,
+.readable-layout .project-desc,
+.readable-layout .reference-item,
+.readable-layout .references-request { font-size: var(--font-base-size); line-height: var(--line-height-base); }
+.readable-layout .section-heading { break-after: avoid; }
+.readable-layout .item-header { break-after: avoid; }
+.readable-layout .item-header,
+.readable-layout .education-item { flex-wrap: wrap; gap: 2pt 8pt; }
+.readable-layout .item-title-group,
+.readable-layout .edu-title-group { display: block; min-width: 0; overflow-wrap: anywhere; }
+.readable-layout .item-meta,
+.readable-layout .edu-meta { white-space: normal; }
+.readable-layout .skill-cat-items { min-width: 0; overflow-wrap: anywhere; }
+
+@media print {
+  html.readable-layout {
+    width: calc(210mm - 2 * var(--page-padding-x));
+    min-height: 0;
+    overflow: visible;
+  }
+  .readable-layout body { width: 100%; min-height: 0; overflow: visible; }
+  .readable-layout .resume-page { padding: 0; }
+}

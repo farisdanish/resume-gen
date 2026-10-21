@@ -26,6 +26,13 @@ describe('SectionOrderSchema', () => {
 });
 
 describe('Phase 9 schemas', () => {
+  test.each([10, 11, 12])('typography-input-validation retains readable font size %i', (bodyFontSize) => {
+    expect(StyleConfigSchema.parse({ bodyFontSize })).toHaveProperty('bodyFontSize', bodyFontSize);
+    expect(StyleConfigSchema.parse({})).not.toHaveProperty('bodyFontSize');
+  });
+  test.each([9, 13, '11', 'large', null])('typography-input-validation rejects unsupported size %j', (bodyFontSize) => {
+    expect(StyleConfigSchema.safeParse({ bodyFontSize }).success).toBe(false);
+  });
   test.each(['javascript:alert(1)', 'data:text/html,unsafe', 'file:///etc/passwd', 'not a URL'])('rejects unsafe project link %s', (link) => {
     expect(ProjectSchema.safeParse({ title: 'Project', description: 'Description', link }).success).toBe(false);
   });

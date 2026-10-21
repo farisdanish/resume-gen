@@ -31,6 +31,30 @@ describe('Server & Loopback Security Test', () => {
     }
   });
 
+  // Catches API silently discarding or accepting an invalid readable font size.
+  test.each([9, 13, '11', 'large'])('typography-input-validation rejects API size %j', async (bodyFontSize) => {
+    for (const endpoint of ['preview', 'generate-pdf']) {
+      const response = await fetch(`${BASE_URL}/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: compatibility, styleConfig: { bodyFontSize } }) });
+      expect(response.status).toBe(400);
+    }
+  });
+
+  test.each([2, 12, 32])('readable-overflow-budget retains content with %i work entries', async (count) => {
+    const resume = { ...compatibility, work: Array.from({ length: count }, () => compatibility.work[0]) };
+    const body = { resume, pageTarget: 2, styleConfig: { bodyFontSize: 11 } };
+    const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    expect(response.status).toBe(200);
+    const { budget } = await response.json();
+    expect(budget.withinTarget).toBe(budget.pageCount <= 2);
+    expect(budget.pageCount).toBe(count === 2 ? 1 : count === 12 ? 2 : 3);
+    const download = await fetch(`${BASE_URL}/api/generate-pdf`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    expect(download.status).toBe(200);
+    const buffer = new Uint8Array(await download.arrayBuffer());
+    expect((await PDFDocument.load(buffer)).getPageCount()).toBe(budget.pageCount);
+    const { text } = await import('unpdf').then(({ extractText }) => extractText(buffer, { mergePages: true }));
+    expect(text).toContain('Project sentinel: reliable production processing.');
+  }, 30000);
+
   test.each([1, 2])('uses actual pages for target %i without changing one-page fullness metadata', async (pageTarget) => {
     const resume = { ...compatibility, work: Array.from({ length: 20 }, () => compatibility.work[0]) };
     const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume, pageTarget }) });

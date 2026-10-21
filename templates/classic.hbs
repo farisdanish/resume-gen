@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{{#if readableTypography}} class="readable-layout"{{/if}}>
 <head>
   <meta charset="UTF-8">
   <title>{{basics.name}} - Resume</title>
@@ -16,14 +16,10 @@
           <h1 class="candidate-name">{{basics.name}}</h1>
           <div class="candidate-title">{{basics.title}}</div>
           <div class="contact-bar contact-identity">
-            {{#if basics.contact.email}}<span class="contact-item"><a href="mailto:{{basics.contact.email}}">{{basics.contact.email}}</a></span>{{/if}}
-            {{#if basics.contact.phone}}<span class="contact-item">{{basics.contact.phone}}</span>{{/if}}
-            {{#if basics.contact.location}}<span class="contact-item">{{basics.contact.location}}</span>{{/if}}
+            {{#each contactIdentity}}{{#unless @first}} | {{/unless}}<span class="contact-item">{{#if href}}<a href="{{href}}">{{text}}</a>{{else}}{{text}}{{/if}}</span>{{/each}}
           </div>
           <div class="contact-bar contact-links">
-            {{#if basics.contact.github}}<span class="contact-item"><a href="{{basics.contact.github}}" target="_blank" rel="noopener noreferrer">GitHub</a></span>{{/if}}
-            {{#if basics.contact.linkedin}}<span class="contact-item"><a href="{{basics.contact.linkedin}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span>{{/if}}
-            {{#if basics.contact.website}}<span class="contact-item"><a href="{{basics.contact.website}}" target="_blank" rel="noopener noreferrer">Website</a></span>{{/if}}
+            {{#each contactLinks}}{{#unless @first}} | {{/unless}}<span class="contact-item"><a href="{{href}}" target="_blank" rel="noopener noreferrer">{{text}}</a></span>{{/each}}
           </div>
         </div>
       </div>

@@ -51,6 +51,75 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  // Catches stale shrink-text advice when switching between two overflowing layouts.
+  it('refreshes readable overflow advice even when the budget state stays overflow', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const resume = { ...resumeFixture, work: Array.from({ length: 24 }, () => resumeFixture.work[0]) };
+      await page.locator('#input-import-json').setInputFiles({ name: 'overflow.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(resume)) });
+      await page.waitForFunction(() => document.getElementById('budget-state')?.textContent?.startsWith('Overflow'));
+      expect(await page.locator('#assistant-tip').textContent()).toContain('Switch to Compact');
+      await page.locator('[data-tab="tab-design"]').click();
+      const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
+      await page.locator('#btn-readable-preset').click();
+      await response;
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#assistant-tip').textContent()).toContain('Shorten a bullet');
+      expect(await page.locator('#assistant-tip').textContent()).not.toContain('Switch to Compact');
+    } finally { await page.close(); }
+  }, 30000);
+
+  // Catches losing explicit typography on reload/import/profile switches, or a preset deleting content.
+  it('typography-profile-roundtrip preserves explicit readable settings without rewriting legacy profiles', async () => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      expect(await page.locator('#select-body-font-size').count()).toBe(1);
+      const legacy = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(legacy.styleConfig.bodyFontSize).toBeUndefined();
+      await page.locator('[data-tab="tab-design"]').click();
+      const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
+      await page.locator('#btn-readable-preset').click();
+      await response;
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
+      expect(await page.locator('#select-density').textContent()).not.toContain('8.5pt');
+      const readable = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(readable.draftResume).toEqual(legacy.draftResume);
+      expect(readable.visibility).toEqual(legacy.visibility);
+      expect(readable.pageTarget).toBe(legacy.pageTarget);
+      expect(readable.styleConfig).toMatchObject({ bodyFontSize: 11, bodyAlignment: 'left', fontPairing: 'modern', sectionScale: {}, accentColor: '#1a202c' });
+      expect(await page.frameLocator('#preview-frame').locator('.highlight-list li').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize) * 72 / 96)).toBeCloseTo(11, 1);
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
+      const portable = await downloadedBytes(page, '#btn-export-json');
+      await page.locator('#profile-name').fill('Readable');
+      await page.locator('#btn-save-named-profile').click();
+      await page.locator('[data-tab="tab-design"]').click();
+      await page.locator('#select-body-font-size').selectOption('12');
+      await page.locator('[data-tab="tab-source"]').click();
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.locator('#btn-load-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Loaded Readable.');
+      expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
+      await page.locator('#input-import-json').setInputFiles({ name: 'readable.json', mimeType: 'application/json', buffer: portable });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Restored complete tailored profile'));
+      expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
+      const before = await page.evaluate(() => ({ draft: localStorage.getItem('resume_gen_draft_v1'), library: localStorage.getItem('resume_gen_profiles_v1') }));
+      const bad = JSON.parse(portable.toString());
+      bad.styleConfig.bodyFontSize = 9;
+      bad.draftResume.basics.name = 'Invalid replacement';
+      await page.locator('#input-import-json').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bad)) });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Failed to import JSON'));
+      expect(await page.evaluate(() => ({ draft: localStorage.getItem('resume_gen_draft_v1'), library: localStorage.getItem('resume_gen_profiles_v1') }))).toEqual(before);
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.texts.unpdf).toContain('Second Project');
+      expect(pdf.textPages.flatMap((p) => p.runs).every((run) => run.height >= 9.9)).toBe(true);
+    } finally { await page.close(); }
+  }, 60000);
+
   it('protects the saved draft when settings change before extraction finishes', async () => {
     const page = await browser.newPage();
     let release!: () => void;

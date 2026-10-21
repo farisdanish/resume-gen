@@ -48,7 +48,22 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
         const paddingTop = parseFloat(style.paddingTop) || 0;
         const paddingBottom = parseFloat(style.paddingBottom) || 0;
         const contentHeight = Math.max(0, container.getBoundingClientRect().height - paddingTop - paddingBottom);
-        const usableHeight = 297 * 96 / 25.4 - paddingTop - paddingBottom;
+        let printMargins = 0;
+        if (document.documentElement.classList.contains('readable-layout')) {
+          // The readable template repeats @page margins on every printed page.
+          // Resolve the matching CSS rule's physical units through the layout engine.
+          const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules));
+          const pageRule = rules.filter((rule): rule is CSSPageRule => rule instanceof CSSPageRule).at(-1);
+          const measure = document.createElement('div');
+          measure.style.position = 'absolute';
+          measure.style.height = pageRule?.style.marginTop || '0px';
+          document.body.append(measure);
+          const top = measure.getBoundingClientRect().height;
+          measure.style.height = pageRule?.style.marginBottom || '0px';
+          printMargins = top + measure.getBoundingClientRect().height;
+          measure.remove();
+        }
+        const usableHeight = 297 * 96 / 25.4 - paddingTop - paddingBottom - printMargins;
         return { contentHeight, usableHeight, fullnessPercent: contentHeight / usableHeight * 100 };
       });
 

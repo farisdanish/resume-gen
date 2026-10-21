@@ -12,6 +12,40 @@ const compatibilityCases = (['modern', 'editorial', 'serif'] as const).flatMap((
 );
 
 describe('ATS Validation Test', () => {
+  // Catches contact rows becoming interleaved in default Poppler extraction.
+  test.each([undefined, 'left', 'right'] as const)('contact-order-extraction preserves identity before links, photo=%s', async (position) => {
+    const resume = structuredClone(compatibility);
+    if (position) Object.assign(resume.basics, { headshot: {
+      dataUri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', shape: 'circle', position,
+    } });
+    const { buffer } = await generatePdf({ html: renderResume(resume, { styleConfig: { headerAlignment: 'center' } }) });
+    const result = await inspectPdf(buffer);
+    for (const raw of Object.values(result.texts)) {
+      const header = raw.slice(0, raw.indexOf('SUMMARY')).replace(/\s+/g, ' ');
+      const tokens = ['alex.morgan@example.com', '+60 10 1234567', 'Seattle, WA', 'GitHub', 'LinkedIn', 'Website'];
+      const positions = tokens.map((token) => header.indexOf(token));
+      expect(positions.every((value) => value >= 0)).toBe(true);
+      positions.slice(1).forEach((value, index) => expect(value).toBeGreaterThan(positions[index]));
+    }
+  }, 30000);
+  // Catches inserted word hyphens and lost source hyphens at PDF line boundaries.
+  test('word-boundary-extraction preserves authored words in narrow prose', async () => {
+    const resume = structuredClone(compatibility);
+    const prose = 'Backend remote CPU-intensive queue-driven processing. '.repeat(6);
+    resume.basics.summary = prose;
+    resume.work[0].highlights = [prose];
+    resume.projects[0].description = prose;
+    const html = renderResume(resume).replace('</head>', '<style>.summary-text,.highlight-list li,.project-desc{width:115px}</style></head>');
+    const { buffer } = await generatePdf({ html });
+    const result = await inspectPdf(buffer);
+    for (const raw of Object.values(result.texts)) {
+      for (const [start, end] of [['SUMMARY', 'EXPERIENCE'], ['EXPERIENCE', 'EDUCATION'], ['PROJECTS', 'sentinel-never-present']]) {
+        const section = raw.slice(raw.indexOf(start), end === 'sentinel-never-present' ? undefined : raw.indexOf(end));
+        for (const word of ['remote', 'CPU-intensive', 'queue-driven']) expect(section.split(word).length - 1, word).toBe(6);
+        expect(section).not.toContain('re‐');
+      }
+    }
+  }, 30000);
   test.each([0.85, 1.15])('retains scaled text on every page at section scale %s', async (scale) => {
     const resume = structuredClone(compatibility);
     resume.work = Array.from({ length: 32 }, (_, i) => ({ ...compatibility.work[0], company: `Employer ${i + 1}` }));

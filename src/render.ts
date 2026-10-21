@@ -15,15 +15,19 @@ function loadBase64Font(filename: string): string {
   return fs.readFileSync(path.join(FONTS_DIR, filename)).toString('base64');
 }
 
-// Keep short numeric ranges as one text run; escape all user-authored content.
+// Keep short semantic tokens as one text run; escape all user-authored content.
 function resumeText(value: unknown): Handlebars.SafeString {
   const text = String(value ?? '');
-  const range = /\b\d{1,6}(?:\.\d{1,3})?[-–]\d{1,6}(?:\.\d{1,3})?%/g;
+  const range = /\b\d{1,6}(?:\.\d{1,3})?[-–]\d{1,6}(?:\.\d{1,3})?%|\b[A-Za-z]+(?:-[A-Za-z]+)+\b/g;
   let html = '';
   let offset = 0;
   for (const match of text.matchAll(range)) {
     html += Handlebars.escapeExpression(text.slice(offset, match.index));
-    html += `<span class="numeric-range">${Handlebars.escapeExpression(match[0])}</span>`;
+    const escaped = Handlebars.escapeExpression(match[0]);
+    const isRange = match[0].endsWith('%');
+    html += isRange || match[0].length <= 32
+      ? `<span class="${isRange ? 'numeric-range' : 'text-compound'}">${escaped}</span>`
+      : escaped;
     offset = match.index! + match[0].length;
   }
   return new Handlebars.SafeString(html + Handlebars.escapeExpression(text.slice(offset)));
@@ -71,6 +75,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   };
 
   let dynamicOverrides = '';
+  let readableOverrides = '';
   if (styleConfig) {
     const accent = styleConfig.accentColor || '#2b6cb0';
 
@@ -135,6 +140,29 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
         --scale-references: ${styleConfig.sectionScale?.references ?? 1};
       }
     `;
+    if (styleConfig.bodyFontSize !== undefined) {
+      const size = styleConfig.bodyFontSize;
+      const sectionGap = styleConfig.density === 'compact' ? 6 : styleConfig.density === 'spacious' ? 10 : 8;
+      readableOverrides = `
+        :root {
+          --font-base-size: ${size}pt;
+          --font-aux-size: 10pt;
+          --font-heading-size: 13pt;
+          --font-name-size: 22pt;
+          --section-gap: ${sectionGap}pt;
+        }
+        ${sectionOrder.map((key) => {
+          const scale = styleConfig.sectionScale?.[key] ?? 1;
+          return `.readable-layout .section-${key} {
+            zoom: 1;
+            --font-base-size: ${Math.max(10, size * scale)}pt;
+            --font-aux-size: ${Math.max(10, 10 * scale)}pt;
+            --font-heading-size: ${Math.max(12, 13 * scale)}pt;
+          }`;
+        }).join('\n')}
+        @page { margin: ${paddingY} ${paddingX}; }
+      `;
+    }
   }
 
   const userStyles = fs.readFileSync(STYLES_PATH, 'utf-8');
@@ -161,8 +189,19 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
 
   return template({
     ...displayResume,
+    readableTypography: styleConfig?.bodyFontSize !== undefined,
+    contactIdentity: [
+      { text: resume.basics.contact.email, href: resume.basics.contact.email ? `mailto:${resume.basics.contact.email}` : undefined },
+      { text: resume.basics.contact.phone },
+      { text: resume.basics.contact.location },
+    ].filter((item) => item.text),
+    contactLinks: [
+      { text: 'GitHub', href: resume.basics.contact.github },
+      { text: 'LinkedIn', href: resume.basics.contact.linkedin },
+      { text: 'Website', href: resume.basics.contact.website },
+    ].filter((item) => item.href),
     headings: resolvedHeadings,
     orderedSections,
-    inlinedStyles: `<style>${fontCss}\n${userStyles}\n${dynamicOverrides}</style>`,
+    inlinedStyles: `<style>${fontCss}\n${userStyles}\n${dynamicOverrides}\n${readableOverrides}</style>`,
   }, { helpers: { resumeText } });
 }

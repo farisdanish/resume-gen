@@ -4,11 +4,68 @@ import { renderResume } from '../src/render';
 import { generatePdf } from '../src/pdf';
 import resume from '../fixtures/resume.json';
 import { createServer } from 'node:http';
+import compatibility from '../fixtures/pdf-compatibility.json';
+import { inspectPdf } from './helpers/pdf-checks';
 
 describe('Design application and measured budget', () => {
   let browser: Browser;
   beforeAll(async () => { browser = await chromium.launch({ headless: true }); });
   afterAll(async () => { await browser?.close(); });
+
+  // Catches small bullets/metadata and section zoom bypassing the 10 pt floor.
+  it.each([10, 11, 12] as const)('readable-effective-font-sizes respects size %i and section-scale floors', async (bodyFontSize) => {
+    const page = await browser.newPage();
+    try {
+      const html = renderResume(compatibility, { styleConfig: {
+        bodyFontSize, sectionScale: { summary: 0.85, experience: 0.85, projects: 0.85 },
+      } });
+      await page.setContent(html);
+      const sizes = await page.evaluate(() => {
+        const pt = (selector: string) => parseFloat(getComputedStyle(document.querySelector(selector)!).fontSize) * 72 / 96;
+        return { summary: pt('.summary-text'), bullet: pt('.highlight-list li'), heading: pt('.section-experience h2'),
+          contact: pt('.contact-bar'), meta: pt('.item-meta'), link: pt('.project-link'), skills: pt('.skill-category-row'),
+          zoom: Number(getComputedStyle(document.querySelector('.section-experience')!).zoom) };
+      });
+      for (const key of ['summary', 'bullet', 'contact', 'meta', 'link', 'skills'] as const) expect(sizes[key], key).toBeGreaterThanOrEqual(9.99);
+      expect(sizes.summary).toBeCloseTo(Math.max(10, bodyFontSize * 0.85), 1);
+      expect(sizes.skills).toBeCloseTo(bodyFontSize, 1);
+      expect(sizes.heading).toBeGreaterThanOrEqual(12);
+      expect(sizes.zoom).toBe(1);
+    } finally { await page.close(); }
+  });
+
+  // Catches continuation pages losing their print margins or final content.
+  it.each(['tight', 'standard', 'spacious'] as const)('readable-print-margins preserves every page at %s margins', async (margins) => {
+    const resume = { ...compatibility, work: Array.from({ length: 30 }, (_, i) => ({ ...compatibility.work[0], company: `Employer ${i + 1}` })) };
+    const { buffer, pageCount } = await generatePdf({ html: renderResume(resume, { styleConfig: { bodyFontSize: 11, margins } }) });
+    expect(pageCount).toBeGreaterThan(1);
+    const result = await inspectPdf(buffer);
+    for (const text of Object.values(result.texts)) expect(text).toContain('Project sentinel: reliable production processing.');
+    const marginY = ({ tight: 10, standard: 12, spacious: 14 }[margins]) * 72 / 25.4;
+    const marginX = ({ tight: 12, standard: 14, spacious: 16 }[margins]) * 72 / 25.4;
+    for (const page of result.textPages) {
+      expect(page.runs.length).toBeGreaterThan(0);
+      for (const run of page.runs) {
+        expect(run.x).toBeGreaterThanOrEqual(marginX - 2);
+        expect(run.x + run.width).toBeLessThanOrEqual(page.width - marginX + 2);
+        expect(run.y).toBeGreaterThanOrEqual(marginY - 2);
+        expect(run.y + run.height).toBeLessThanOrEqual(page.height - marginY + 2);
+      }
+    }
+  }, 30000);
+
+  // Catches a job heading stranded at the page bottom before its first bullet.
+  it('keeps readable job headings with their first evidence line', async () => {
+    const data = { ...compatibility, work: Array.from({ length: 32 }, (_, i) => ({ ...compatibility.work[0], company: `Employer ${i + 1}` })) };
+    data.basics = { ...data.basics, summary: data.basics.summary + ' Seeking remote work on CPU-intensive queue-driven systems.' };
+    const { buffer } = await generatePdf({ html: renderResume(data, { styleConfig: { bodyFontSize: 11, fontPairing: 'modern', bodyAlignment: 'left' } }) });
+    const result = await inspectPdf(buffer);
+    for (const page of result.textPages) {
+      const lastRun = page.runs.at(-1)!.text;
+      expect(lastRun).not.toMatch(/Present$/);
+      expect(lastRun).not.toMatch(/Employer \d+$/);
+    }
+  }, 30000);
 
   it('applies Design controls to computed styles rather than merely emitting CSS', async () => {
     const page = await browser.newPage();

@@ -117,6 +117,22 @@ describe('Smoke Test Suite', () => {
   describe('SMOKE 3: CLI Exit Code Contract', () => {
     const cliScript = path.resolve(ROOT_DIR, 'src/cli.ts');
 
+    test.each(['9', '13', 'large'])('typography-input-validation rejects CLI size %s', async (value) => {
+      const result = await execa('npx', ['tsx', cliScript, '--source', 'fixture', '--body-font-size', value], { cwd: ROOT_DIR, reject: false });
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('--body-font-size');
+    });
+
+    test.each(['10', '11', '12'])('exports readable CLI size %s without losing content', async (value) => {
+      const output = path.join(SCRATCH_DIR, `readable-${value}.pdf`);
+      const result = await execa('npx', ['tsx', cliScript, '--source', 'fixture', '--body-font-size', value, '--out', output], { cwd: ROOT_DIR, reject: false });
+      expect(result.exitCode).toBe(0);
+      const { inspectPdf } = await import('./helpers/pdf-checks');
+      const pdf = await inspectPdf(fs.readFileSync(output));
+      expect(pdf.texts.unpdf).toContain('ALEX MORGAN');
+      expect(pdf.textPages.flatMap((p) => p.runs).every((run) => run.height >= 9.9)).toBe(true);
+    }, 30000);
+
     test.each([1, 2])('enforces explicit page target %i and supports month-name dates', async (target) => {
       const input = path.join(SCRATCH_DIR, `target-${target}.json`);
       const output = path.join(SCRATCH_DIR, `target-${target}.pdf`);

@@ -247,7 +247,30 @@ Every implementation phase has a smoke checkpoint before the next phase proceeds
 4. Named variants: save/load independent drafts, explicit duplicate update, dirty-switch cancellation/reload, portable JSON/PDF export, and corrupt/quota-failed storage.
 5. Final: full tests, typecheck, JS syntax and diff checks; extraction → editing → settings/profile changes → preview → PDF download; render every page of representative one/two/overflow-page PDFs.
 
-Continuation pages currently retain the existing print-margin behavior: text can begin near the page edge. Repeated print margins are a separate layout refinement; no clipping was observed in the inspected smoke PDFs.
+### Readable typography and extraction fixes
+
+Design → **Apply readable preset** selects 11 pt body text, modern Liberation Sans, dark headings, left-aligned prose, standard density/margins and unscaled sections. It keeps your content, photo, reference visibility and page target unchanged. This follows the 10–12 pt body-text range, restrained font choices and strong contrast discussed in [Jobstreet's font guide](https://my.jobstreet.com/career-advice/article/guide-to-choosing-best-fonts-for-resume). It is not an employer ATS certification.
+
+Choose **Body text size → 10 / 11 / 12 pt** to enable readable typography independently. Density then changes spacing rather than font size. Section scaling cannot reduce body/contact/metadata text below 10 pt or section headings below 12 pt. Larger text can need two pages: shorten content, hide an optional section such as references, or choose the existing two-page target. Exports do not silently shrink or delete content to fit.
+
+**Existing density sizing** restores the original density/scaling behavior. Older profiles keep that behavior until you choose an explicit text size. The optional numeric `styleConfig.bodyFontSize` is saved with autosave, named profiles and portable JSON; it accepts only 10, 11 or 12. No profile version migration is required. CLI usage:
+
+```bash
+npm run generate -- --source fixture --body-font-size 11 --page-target 2 --out out/readable.pdf
+```
+
+Omit `--body-font-size` to retain legacy sizing. Unsupported sizes exit with code 1. `--strict-pages` still exits with code 2 if the actual PDF exceeds the selected target.
+
+Readable exports repeat the chosen margins on every printed page. Legacy exports retain their previous pagination, including continuation text that can start near the page edge. Geometric budget fullness is measured at the readable print width and usable height; actual PDF page count remains authoritative.
+
+Automatic prose hyphenation is disabled. Short authored alphabetic hyphenated compounds (up to 32 characters) and percentage ranges remain whole PDF text runs, with escaped source text and unchanged punctuation. Longer tokens and URLs remain wrappable. Contacts use two ordinary text rows with literal separators to preserve extraction order, including missing fields and photo layouts.
+
+Smoke checkpoints for these changes:
+
+1. Word preservation: `npm test -- test/render.test.ts test/ats.test.ts`; export photo/no-photo PDFs, check extracted words with Poppler/unpdf and pypdf/pdfplumber, then inspect every rendered page.
+2. Contact order: `npm test -- test/ats.test.ts -t contact-order`; inspect long/missing contacts with left/right photos, verify reading order and link annotations.
+3. Readable layout: `npm test -- test/schema.test.ts test/layout.test.ts test/server.test.ts test/ui.test.ts test/smoke.test.ts -t 'typography-|readable'`; round-trip settings, reject invalid imports, compare actual page count with budget, inspect every page and font/margin bounds of one/two/overflow exports.
+4. Final: `npm test`, `npm run typecheck`, `node --check ui/app.js`, `git diff --check`; complete extraction → editing → readable preset → preview → PDF download. Recheck text, links, page count, margins and normal-size readability. Independent PDF parsers are evidence about extraction, not proof of employer ATS acceptance or PDF accessibility tagging.
 
 The known loopback test currently uses a substring match that can confuse port 3000 with unrelated ports such as 30007. Report that baseline failure separately; do not skip or weaken the assertion to make this release green.
 

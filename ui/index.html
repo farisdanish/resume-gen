@@ -386,7 +386,18 @@
                 </select>
               </div>
               <div class="form-group" style="margin-top: 8px;">
-                <label for="select-density" class="form-label">Vertical Density / Font Scaling:</label>
+                <label for="select-body-font-size" class="form-label">Body text size:</label>
+                <select id="select-body-font-size" class="win-input" style="width: 100%;">
+                  <option value="">Existing density sizing</option>
+                  <option value="10">10 pt</option>
+                  <option value="11">11 pt</option>
+                  <option value="12">12 pt</option>
+                </select>
+                <button id="btn-readable-preset" class="win-btn" style="margin-top: 6px; width: 100%;">Apply readable preset</button>
+                <p style="margin-top: 4px;">11 pt body text, dark text and left alignment. Larger text may need two pages; choose your page target or shorten content. Explicit 10–12 pt sizing keeps scaled text at least 10 pt.</p>
+              </div>
+              <div class="form-group" style="margin-top: 8px;">
+                <label for="select-density" class="form-label">Density (spacing only with explicit text size):</label>
                 <select id="select-density" class="win-input" style="width: 100%;">
                   <option value="compact">Compact (8.0pt, 1.25 line height) — High Density</option>
                   <option value="standard" selected>Standard (8.5pt, 1.35 line height) — Balanced</option>
@@ -553,7 +564,7 @@
         <dt>3. Choose a Design</dt>
         <dd>Adjust fonts, accent color, density, margins, alignment, and section sizes. Choose date display (ISO or month name) and a one- or two-page target. In Sections, rename headings or change their order.</dd>
         <dt>4. Watch the page budget</dt>
-        <dd>Changes refresh the preview automatically. The budget measures fullness against your selected page target and checks the actual PDF page count. If it overflows, shorten text, hide an item, or try Compact density and Tight margins. The preview displays the first page; export the PDF to inspect all pages.</dd>
+        <dd>Changes refresh the preview automatically. The budget measures fullness against your selected page target and checks the actual PDF page count. Apply the readable preset in Design for 11 pt body text; choose 10–12 pt explicitly or keep existing density sizing. Density changes spacing with an explicit size. If it overflows, shorten text, hide an optional item such as references, or choose a two-page target. The preset keeps content and the page target unchanged. The preview displays the first page; export the PDF to inspect all pages. Readable exports repeat margins on continuation pages. PDF extraction checks do not certify employer ATS acceptance or tagged-PDF accessibility.</dd>
         <dt>5. Save Profile for later</dt>
         <dd>Save Profile downloads your content and settings as JSON. Load Profile restores it. Your browser also saves your draft locally. Saved Profiles stores your own named content variants in this browser. Save Current creates a snapshot; Update Saved Profile explicitly replaces it. Loading another profile asks before replacing unsaved edits.</dd>
         <dt>6. Export your PDF</dt>

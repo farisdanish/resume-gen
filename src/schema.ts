@@ -120,6 +120,7 @@ export type Resume = z.infer<typeof ResumeSchema>;
 export const StyleConfigSchema = z
   .object({
     fontPairing: z.enum(['modern', 'editorial', 'serif']).default('editorial'),
+    bodyFontSize: z.union([z.literal(10), z.literal(11), z.literal(12)]).optional(),
     accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#2b6cb0'),
     density: z.enum(['compact', 'standard', 'spacious']).default('standard'),
     margins: z.enum(['tight', 'standard', 'spacious']).default('standard'),

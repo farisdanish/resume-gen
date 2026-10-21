@@ -16,16 +16,19 @@ program
   .option('-p, --phone <phone>', 'Phone override string')
   .option('-o, --out <path>', 'Output PDF path', 'out/resume.pdf')
   .option('--date-format <format>', 'Date presentation: iso or month-name', 'iso')
+  .option('--body-font-size <points>', 'Readable body font size: 10, 11 or 12 pt; omitted keeps density sizing')
   .option('--page-target <pages>', 'Target page count: 1 or 2', '1')
   .option('--strict-pages', 'Exit with code 2 if output exceeds the selected page target', false)
   .option('--strict-warnings', 'Exit with code 3 if DOM extraction produces warnings', false);
 
 program.action(async (options) => {
   try {
-    const styleValidation = StyleConfigSchema.safeParse({ dateFormat: options.dateFormat });
+    const styleValidation = StyleConfigSchema.safeParse({ dateFormat: options.dateFormat,
+      ...(options.bodyFontSize !== undefined ? { bodyFontSize: Number(options.bodyFontSize) } : {}),
+    });
     const targetValidation = PageTargetSchema.safeParse(Number(options.pageTarget));
     if (!styleValidation.success || !targetValidation.success) {
-      console.error('[Error 1] Use --date-format iso|month-name and --page-target 1|2');
+      console.error('[Error 1] Use --date-format iso|month-name, --page-target 1|2 and --body-font-size 10|11|12');
       process.exit(1);
     }
     const pageTarget = targetValidation.data;

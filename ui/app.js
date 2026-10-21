@@ -137,6 +137,8 @@
   const selectDateFormat = document.getElementById('select-date-format');
   const selectPageTarget = document.getElementById('select-page-target');
   const selectDensity = document.getElementById('select-density');
+  const selectBodyFontSize = document.getElementById('select-body-font-size');
+  const btnReadablePreset = document.getElementById('btn-readable-preset');
   const selectMargins = document.getElementById('select-margins');
   const colorSwatches = document.getElementById('color-swatches');
   const inputCustomColor = document.getElementById('input-custom-color');
@@ -622,6 +624,8 @@
     const budgetLabel = document.getElementById('budget-label');
     if (budgetLabel) budgetLabel.textContent = `Measured fullness of ${pageTarget}-page target`;
     if (selectDensity) selectDensity.value = styleConfig.density || 'standard';
+    if (selectBodyFontSize) selectBodyFontSize.value = styleConfig.bodyFontSize === undefined ? '' : String(styleConfig.bodyFontSize);
+    updateDensityLabels();
     if (selectMargins) selectMargins.value = styleConfig.margins || 'standard';
     if (selectBodyAlignment) selectBodyAlignment.value = styleConfig.bodyAlignment || 'justify';
     if (selectHeaderAlignment) selectHeaderAlignment.value = styleConfig.headerAlignment || 'left';
@@ -1092,6 +1096,16 @@
     });
   }
 
+  function updateDensityLabels() {
+    const readable = styleConfig.bodyFontSize !== undefined;
+    for (const option of selectDensity?.options || []) {
+      const [label, legacySize, line] = {
+        compact: ['Compact', '8.0', '1.25'], standard: ['Standard', '8.5', '1.35'], spacious: ['Spacious', '9.0', '1.45'],
+      }[option.value];
+      option.textContent = readable ? `${label} (${line} line height)` : `${label} (${legacySize}pt, ${line} line height)`;
+    }
+  }
+
   async function processHeadshot(file) {
     if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
       throw new Error('Choose a PNG, JPEG, or WebP image');
@@ -1170,6 +1184,20 @@
   });
   selectDensity?.addEventListener('change', (e) => {
     styleConfig.density = e.target.value;
+    scheduleDebouncedPreview();
+  });
+
+  selectBodyFontSize?.addEventListener('change', (e) => {
+    if (e.target.value === '') delete styleConfig.bodyFontSize;
+    else styleConfig.bodyFontSize = Number(e.target.value);
+    updateDensityLabels();
+    scheduleDebouncedPreview();
+  });
+
+  btnReadablePreset?.addEventListener('click', () => {
+    Object.assign(styleConfig, { bodyFontSize: 11, fontPairing: 'modern', density: 'standard',
+      margins: 'standard', bodyAlignment: 'left', sectionScale: {}, accentColor: '#1a202c' });
+    populateContentForm();
     scheduleDebouncedPreview();
   });
 
@@ -1668,6 +1696,7 @@
       || !['left', 'justify'].includes(nextStyle.bodyAlignment)
       || !['left', 'center'].includes(nextStyle.headerAlignment)
       || !['iso', 'month-name'].includes(nextStyle.dateFormat)
+      || (nextStyle.bodyFontSize !== undefined && ![10, 11, 12].includes(nextStyle.bodyFontSize))
       || Object.entries(nextStyle.sectionScale).some(([key, value]) =>
         !DEFAULT_SECTION_ORDER.includes(key)
         || ![0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15].includes(value))
@@ -1762,7 +1791,9 @@
         const enabled = chkOfficeAssistant?.checked !== false;
         if (enabled && (state === 'near' || state === 'overflow') && !dismissedAssistantStates.has(state)) {
           if (assistantTip) assistantTip.textContent = state === 'overflow'
-            ? 'Switch to Compact density or Tight margins, then hide a lower-priority item.'
+            ? (styleConfig.bodyFontSize !== undefined
+              ? 'Shorten a bullet, hide an optional item such as references, or choose a two-page target. Keep text readable.'
+              : 'Switch to Compact density or Tight margins, then hide a lower-priority item.')
             : 'Consider shortening a bullet before adding more content.';
           if (officeAssistant) officeAssistant.hidden = false;
         } else if (state === 'comfortable' && officeAssistant) {

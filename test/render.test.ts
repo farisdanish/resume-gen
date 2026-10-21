@@ -3,6 +3,18 @@ import { renderResume } from '../src/render';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Template & Render Engine', () => {
+  it('protects short compounds while escaping markup and leaving long tokens wrappable', () => {
+    const long = 'this-is-an-intentionally-extremely-long-hyphenated-token';
+    const html = renderResume({ ...resumeFixture, basics: { ...resumeFixture.basics,
+      summary: `CPU-intensive queue-driven ${long} <img src=x onerror=alert(1)> 80–90%`,
+    } });
+    expect(html).toContain('<span class="text-compound">CPU-intensive</span>');
+    expect(html).toContain('<span class="text-compound">queue-driven</span>');
+    expect(html).not.toContain(`<span class="text-compound">${long}</span>`);
+    expect(html).toContain(` ${long} &lt;img`);
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('<span class="numeric-range">80–90%</span>');
+  });
   it('keeps percentage ranges intact without interpreting description markup', () => {
     const html = renderResume({ ...resumeFixture, basics: { ...resumeFixture.basics,
       summary: 'Improved 80–90% and 80-90% <img src=x onerror=alert(1)>',
