@@ -155,6 +155,24 @@
   const btnOrderGraduate = document.getElementById('btn-order-graduate');
 
   let debounceTimer = null;
+  let previewRevision = 0;
+  let previewController = null;
+
+  function invalidatePreview() {
+    previewRevision += 1;
+    previewController?.abort();
+    setBudgetUnavailable('Budget unavailable — preview is out of date');
+  }
+
+  function setBudgetUnavailable(message) {
+    if (budgetPercent) budgetPercent.textContent = '—';
+    if (budgetMeterFill) budgetMeterFill.style.width = '0%';
+    if (budgetMeter) budgetMeter.removeAttribute('aria-valuenow');
+    if (budgetGuard) budgetGuard.dataset.state = 'waiting';
+    if (budgetState) budgetState.textContent = message;
+    if (officeAssistant) officeAssistant.hidden = true;
+    currentBudgetState = 'waiting';
+  }
 
   function getApiUrl(endpoint) {
     if (window.location.protocol === 'file:') {
@@ -304,6 +322,8 @@
   }
 
   function scheduleDebouncedPreview() {
+    invalidatePreview();
+    setStatus('Preview out of date', 'Not measured');
     saveStateToStorage();
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -1140,10 +1160,17 @@
       return;
     }
 
+    if (debounceTimer) clearTimeout(debounceTimer);
+    invalidatePreview();
+    const revision = previewRevision;
+    const controller = new AbortController();
+    previewController = controller;
+    const timeout = setTimeout(() => controller.abort(new Error('Preview timed out after 20 seconds')), 20_000);
     try {
-      setStatus('Compiling Handlebars template...');
+      setStatus('Measuring document layout...', 'Measuring...');
 
       const res = await fetch(getApiUrl('/api/preview'), {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1155,7 +1182,9 @@
       });
 
       const result = await res.json();
+      if (revision !== previewRevision) return;
       if (!res.ok || !result.success) {
+        setBudgetUnavailable('Budget unavailable — previous preview is out of date');
         log(`Rendering failed: ${result.error}`, 'error');
         if (result.issues) {
           result.issues.forEach((i) => log(`[Validation] ${i.path.join('.')}: ${i.message}`, 'warn'));
@@ -1164,14 +1193,30 @@
         return;
       }
 
-      if (previewFrame) previewFrame.srcdoc = result.html;
+      if (!result.budget || !Number.isFinite(result.budget.fullnessPercent)
+        || !Number.isInteger(result.budget.pageCount) || result.budget.pageCount < 1) {
+        throw new Error('Preview response is missing valid layout measurements');
+      }
+      if (previewFrame) {
+        previewFrame.onload = () => {
+          if (revision !== previewRevision) return;
+          updateBudgetIndicator(result.budget);
+        };
+        previewFrame.srcdoc = result.html;
+      } else {
+        updateBudgetIndicator(result.budget);
+      }
       if (placeholderOverlay) placeholderOverlay.style.display = 'none';
 
       log('Sandboxed preview successfully updated.', 'info');
-      updateBudgetIndicator(payload);
     } catch (err) {
+      if (revision !== previewRevision) return;
+      setBudgetUnavailable('Budget unavailable — previous preview is out of date');
       log(`Preview error: ${err.message}`, 'error');
       setStatus('Preview failed', 'Error');
+    } finally {
+      clearTimeout(timeout);
+      if (previewController === controller) previewController = null;
     }
   }
 
@@ -1359,6 +1404,7 @@
 
   async function validateImportedProfile(profile) {
     const res = await fetch(getApiUrl('/api/preview'), {
+      signal: AbortSignal.timeout(20_000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1401,54 +1447,20 @@
     e.target.value = '';
   }
 
-  function estimateBudgetFill(resume) {
-    const summaryLength = resume.basics?.summary?.length || 0;
-    const workWeight = (resume.work || []).reduce((total, item) => {
-      const highlights = (item.highlights || []).reduce(
-        (sum, highlight) => sum + Math.max(2.5, highlight.length / 42),
-        0
-      );
-      return total + 5 + highlights;
-    }, 0);
-    const educationWeight = (resume.education || []).length * 4;
-    const skillsWeight = (resume.skills || []).reduce(
-      (total, category) => total + 2.5 + (category.items || []).join(', ').length / 90,
-      0
-    );
-    const projectWeight = (resume.projects || []).reduce(
-      (total, project) => total + 4 + (project.description?.length || 0) / 55,
-      0
-    );
-    const certificationWeight = (resume.certifications || []).length ? 3.5 : 0;
-    const referenceWeight = resume.references?.mode === 'entries'
-      ? resume.references.entries.length * 4
-      : resume.references ? 2.5 : 0;
-    const headshotWeight = resume.basics?.headshot ? 5 : 0;
-    const scales = Object.values(styleConfig.sectionScale || {});
-    const sectionScaleFactor = scales.length
-      ? scales.reduce((sum, scale) => sum + scale, 0) / scales.length
-      : 1;
-    const rawFill = 18 + summaryLength / 45 + workWeight + educationWeight
-      + skillsWeight + projectWeight + certificationWeight + referenceWeight + headshotWeight;
-    const densityFactor = { compact: 0.88, standard: 1, spacious: 1.12 }[styleConfig.density] || 1;
-    const marginFactor = { tight: 0.93, standard: 1, spacious: 1.08 }[styleConfig.margins] || 1;
-    return Math.max(0, rawFill * densityFactor * marginFactor * sectionScaleFactor);
-  }
-
-  function updateBudgetIndicator(resume) {
+  function updateBudgetIndicator(budget) {
     try {
-      const fill = estimateBudgetFill(resume);
-      const state = fill > 100 ? 'overflow' : fill >= 85 ? 'near' : 'comfortable';
+      const fill = budget.fullnessPercent;
+      const state = budget.pageCount > 1 ? 'overflow' : fill >= 85 ? 'near' : 'comfortable';
       if (budgetPercent) budgetPercent.textContent = `${Math.round(fill)}%`;
       if (budgetMeterFill) budgetMeterFill.style.width = `${Math.min(fill, 100)}%`;
       if (budgetMeter) budgetMeter.setAttribute('aria-valuenow', String(Math.min(Math.round(fill), 100)));
       if (budgetGuard) budgetGuard.dataset.state = state;
       if (budgetState) {
         budgetState.textContent = state === 'overflow'
-          ? 'Overflow likely — generated PDF may exceed one page'
+          ? `Overflow — generated PDF has ${budget.pageCount} pages`
           : state === 'near' ? 'Near the one-page limit' : 'Comfortable fit';
       }
-      setStatus('Document rendered in sandbox', state === 'overflow' ? 'Est. 2+ pages' : 'Page 1/1');
+      setStatus('Document rendered in sandbox', `Page ${budget.pageCount}/${budget.pageCount}`);
       if (state !== currentBudgetState) {
         currentBudgetState = state;
         const enabled = chkOfficeAssistant?.checked !== false;
@@ -1462,7 +1474,7 @@
         }
       }
     } catch (err) {
-      log(`Budget estimate unavailable: ${err.message}`, 'warn');
+      log(`Budget measurement unavailable: ${err.message}`, 'warn');
     }
   }
 

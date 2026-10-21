@@ -57,7 +57,7 @@ Exit Codes: 0 to 4                 │
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 24.x or 22.x (22.12 or newer)
 - Playwright Chromium binaries
 
 ### Setup
@@ -137,7 +137,7 @@ The loopback server exposes the following REST endpoints:
 
 - `GET /api/health` — Returns server status and loopback binding information.
 - `POST /api/extract` — Accepts `{ source?: string, phoneOverride?: string }`, returns parsed resume JSON and extraction warnings.
-- `POST /api/preview` — Accepts `{ resume: Resume }`, returns `{ success: true, html: string }`.
+- `POST /api/preview` — Accepts `{ resume: Resume }`, returns `{ success: true, html: string, budget: { fullnessPercent: number, pageCount: number, isSinglePage: boolean } }`.
 - `POST /api/generate-pdf` — Accepts `{ resume: Resume }` or `{ html: string }`, returns binary `application/pdf` with `X-Page-Count` headers.
 
 ---
@@ -199,6 +199,23 @@ resume-gen/
 ├── tsconfig.json
 └── README.md
 ```
+
+---
+
+### Design and page budget
+
+Design changes refresh the preview after a short debounce. Density scales body
+text and line spacing; per-section scaling affects only its selected section.
+The server waits for fonts and images, measures content against the usable A4
+height, and generates a PDF to obtain the actual page count. Fullness can exceed
+100%; overflow warnings use the PDF page count. The preview shows the first A4
+page, so the exported PDF is the way to inspect subsequent pages.
+
+Preview measurement runs in Chromium and can take longer than HTML compilation.
+Browser work has a 15-second deadline; preview requests time out after 20 seconds.
+Pending or failed previews show the budget as unavailable, and older responses
+cannot replace newer edits. PDF export still permits multiple pages and reports
+their actual count. Saved profiles and the iframe sandbox are unchanged.
 
 ---
 

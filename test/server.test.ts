@@ -2,6 +2,8 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { execSync } from 'node:child_process';
 import { startServer } from '../src/server';
 import type { Server } from 'node:http';
+import resumeFixture from '../fixtures/resume.json';
+import { PDFDocument } from 'pdf-lib';
 
 describe('Server & Loopback Security Test', () => {
   let serverInstance: any;
@@ -111,6 +113,28 @@ describe('Server & Loopback Security Test', () => {
     expect(previewBody.html).toContain('WORK HISTORY');
     expect(previewBody.html.indexOf('Technical Skills')).toBeLessThan(previewBody.html.indexOf('WORK HISTORY'));
   });
+
+  test.each([1, 20])('Preview and export agree on actual pagination with %i work items', async (count) => {
+    const payload = {
+      resume: { ...resumeFixture, work: Array.from({ length: count }, () => resumeFixture.work[0]) },
+      styleConfig: { margins: 'spacious', fontPairing: 'serif', sectionScale: { experience: 1.15 } },
+    };
+    const preview = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    expect(preview.status).toBe(200);
+    const { budget } = await preview.json();
+    expect(budget.fullnessPercent).toBeGreaterThan(0);
+    const exported = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    expect(exported.status).toBe(200);
+    const pdf = await PDFDocument.load(await exported.arrayBuffer());
+    expect(budget.pageCount).toBe(pdf.getPageCount());
+    expect(budget.isSinglePage).toBe(count === 1);
+    expect(Number(exported.headers.get('X-Page-Count'))).toBe(budget.pageCount);
+    if (count === 20) expect(budget.fullnessPercent).toBeGreaterThan(100);
+  }, 30000);
 
   test('POST /api/preview: Rejects duplicate or incomplete section order', async () => {
     const extractRes = await fetch(`${BASE_URL}/api/extract`, {

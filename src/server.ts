@@ -104,9 +104,11 @@ app.post('/api/preview', async (c) => {
     const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
     const html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
+    const { layout, pageCount, isSinglePage } = await generatePdf({ html });
     return c.json({
       success: true,
       html,
+      budget: { fullnessPercent: layout.fullnessPercent, pageCount, isSinglePage },
     });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
