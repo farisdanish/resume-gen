@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import { runExtraction } from './extract';
 import {
   ResumeSchema,
+  PageTargetSchema,
   StyleConfigSchema,
   SectionHeadingsSchema,
   SectionOrderSchema,
@@ -64,6 +65,9 @@ app.post('/api/extract', async (c) => {
 app.post('/api/preview', async (c) => {
   try {
     const body = await c.req.json();
+    const targetValidation = PageTargetSchema.safeParse(body.pageTarget);
+    if (!targetValidation.success) return c.json({ success: false, error: 'Invalid page target', issues: targetValidation.error.issues }, 400);
+    const pageTarget = targetValidation.data;
     const resumeData = body.resume || body;
     const validation = ResumeSchema.safeParse(resumeData);
 
@@ -108,7 +112,7 @@ app.post('/api/preview', async (c) => {
     return c.json({
       success: true,
       html,
-      budget: { fullnessPercent: layout.fullnessPercent, pageCount, isSinglePage },
+      budget: { fullnessPercent: layout.fullnessPercent, pageCount, isSinglePage, pageTarget, withinTarget: pageCount <= pageTarget, targetFullnessPercent: layout.fullnessPercent / pageTarget },
     });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);
@@ -119,6 +123,9 @@ app.post('/api/preview', async (c) => {
 app.post('/api/generate-pdf', async (c) => {
   try {
     const body = await c.req.json();
+    const targetValidation = PageTargetSchema.safeParse(body.pageTarget);
+    if (!targetValidation.success) return c.json({ success: false, error: 'Invalid page target', issues: targetValidation.error.issues }, 400);
+    const pageTarget = targetValidation.data;
     let html = body.html;
 
     if (!html) {
@@ -170,6 +177,8 @@ app.post('/api/generate-pdf', async (c) => {
       'Content-Disposition': 'attachment; filename="resume.pdf"',
       'X-Page-Count': String(pageCount),
       'X-Is-Single-Page': String(isSinglePage),
+      'X-Page-Target': String(pageTarget),
+      'X-Within-Target': String(pageCount <= pageTarget),
     });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 500);

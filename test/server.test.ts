@@ -4,6 +4,7 @@ import { startServer } from '../src/server';
 import type { Server } from 'node:http';
 import resumeFixture from '../fixtures/resume.json';
 import { PDFDocument } from 'pdf-lib';
+import compatibility from '../fixtures/pdf-compatibility.json';
 
 describe('Server & Loopback Security Test', () => {
   let serverInstance: any;
@@ -29,6 +30,34 @@ describe('Server & Loopback Security Test', () => {
       await new Promise<void>((resolve) => serverInstance.close(() => resolve()));
     }
   });
+
+  test.each([1, 2])('uses actual pages for target %i without changing one-page fullness metadata', async (pageTarget) => {
+    const resume = { ...compatibility, work: Array.from({ length: 20 }, () => compatibility.work[0]) };
+    const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume, pageTarget }) });
+    expect(response.status).toBe(200);
+    const { budget } = await response.json();
+    expect(budget.pageCount).toBe(2);
+    expect(budget.pageTarget).toBe(pageTarget);
+    expect(budget.withinTarget).toBe(pageTarget === 2);
+    expect(budget.targetFullnessPercent).toBeCloseTo(budget.fullnessPercent / pageTarget);
+  }, 30000);
+
+  test.each([0, 3, '2'])('rejects invalid page target %j in preview and PDF endpoints', async (pageTarget) => {
+    for (const endpoint of ['preview', 'generate-pdf']) {
+      const response = await fetch(`${BASE_URL}/api/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: compatibility, pageTarget }) });
+      expect(response.status).toBe(400);
+    }
+  });
+
+  test('reports three pages as over both supported targets', async () => {
+    const resume = { ...compatibility, work: Array.from({ length: 60 }, () => compatibility.work[0]) };
+    for (const pageTarget of [1, 2]) {
+      const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume, pageTarget }) });
+      const { budget } = await response.json();
+      expect(budget.pageCount).toBeGreaterThan(2);
+      expect(budget.withinTarget).toBe(false);
+    }
+  }, 30000);
 
   test('Security Invariant: Strictly bound to 127.0.0.1 loopback', () => {
     const ssOutput = execSync('ss -ltn').toString();

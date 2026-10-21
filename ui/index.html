@@ -174,7 +174,7 @@
             </fieldset>
 
             <fieldset class="win-fieldset budget-guard" aria-labelledby="budget-label">
-              <legend class="win-legend">1-Page Budget Guard</legend>
+              <legend class="win-legend">Page Budget Guard</legend>
               <div class="budget-label-row">
                 <span id="budget-label">Measured page fullness</span>
                 <strong id="budget-percent">0%</strong>
@@ -205,7 +205,7 @@
                   <span>👁️ Refresh Live Preview</span>
                 </button>
                 <button class="win-button win-button-primary btn-block" id="btn-download-pdf">
-                  <span>💾 Export 1-Page PDF</span>
+                  <span>💾 Export PDF</span>
                 </button>
               </div>
             </fieldset>
@@ -378,6 +378,14 @@
                   <option value="spacious">Spacious (9.0pt, 1.45 line height) — Relaxed</option>
                 </select>
               </div>
+            </fieldset>
+
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Dates &amp; Page Target</legend>
+              <label class="form-label" for="select-date-format">Date display:</label>
+              <select id="select-date-format" class="win-input"><option value="iso">ISO (2024-12)</option><option value="month-name">Month name (Dec 2024)</option></select>
+              <label class="form-label" for="select-page-target">Page target:</label>
+              <select id="select-page-target" class="win-input"><option value="1">1 page</option><option value="2">2 pages</option></select>
             </fieldset>
 
             <!-- Color Palette Section -->

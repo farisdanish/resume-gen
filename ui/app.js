@@ -41,6 +41,7 @@
     margins: 'standard',
     bodyAlignment: 'justify',
     headerAlignment: 'left',
+    dateFormat: 'iso',
     sectionScale: {},
   };
   let sectionHeadings = {
@@ -53,6 +54,7 @@
     REFERENCES: 'REFERENCES',
   };
   let sectionOrder = [...DEFAULT_SECTION_ORDER];
+  let pageTarget = 1;
   let currentBudgetState = 'waiting';
   const dismissedAssistantStates = new Set();
 
@@ -132,6 +134,8 @@
 
   // DOM Elements - Design & Styling
   const selectFontPairing = document.getElementById('select-font-pairing');
+  const selectDateFormat = document.getElementById('select-date-format');
+  const selectPageTarget = document.getElementById('select-page-target');
   const selectDensity = document.getElementById('select-density');
   const selectMargins = document.getElementById('select-margins');
   const colorSwatches = document.getElementById('color-swatches');
@@ -350,6 +354,7 @@
         styleConfig,
         sectionHeadings,
         sectionOrder,
+        pageTarget,
         savedAt: new Date().toISOString(),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bundle));
@@ -374,6 +379,9 @@
         };
         sectionHeadings = { ...sectionHeadings, ...(bundle.sectionHeadings || {}) };
         sectionOrder = normalizeSectionOrder(bundle.sectionOrder);
+        if (![1, 2].includes(bundle.pageTarget ?? 1)) throw new Error('Invalid saved page target');
+        pageTarget = bundle.pageTarget ?? 1;
+        styleConfig.dateFormat = styleConfig.dateFormat || 'iso';
         return true;
       }
     } catch (e) {
@@ -473,6 +481,10 @@
 
     // Design & Theme controls
     if (selectFontPairing) selectFontPairing.value = styleConfig.fontPairing || 'editorial';
+    if (selectDateFormat) selectDateFormat.value = styleConfig.dateFormat || 'iso';
+    if (selectPageTarget) selectPageTarget.value = String(pageTarget);
+    const budgetLabel = document.getElementById('budget-label');
+    if (budgetLabel) budgetLabel.textContent = `Measured fullness of ${pageTarget}-page target`;
     if (selectDensity) selectDensity.value = styleConfig.density || 'standard';
     if (selectMargins) selectMargins.value = styleConfig.margins || 'standard';
     if (selectBodyAlignment) selectBodyAlignment.value = styleConfig.bodyAlignment || 'justify';
@@ -1014,6 +1026,12 @@
     scheduleDebouncedPreview();
   });
 
+  selectDateFormat?.addEventListener('change', (e) => { styleConfig.dateFormat = e.target.value; scheduleDebouncedPreview(); });
+  selectPageTarget?.addEventListener('change', (e) => {
+    pageTarget = Number(e.target.value);
+    document.getElementById('budget-label').textContent = `Measured fullness of ${pageTarget}-page target`;
+    scheduleDebouncedPreview();
+  });
   selectDensity?.addEventListener('change', (e) => {
     styleConfig.density = e.target.value;
     scheduleDebouncedPreview();
@@ -1305,6 +1323,7 @@
           styleConfig,
           headings: sectionHeadings,
           sectionOrder,
+          pageTarget,
         }),
       });
 
@@ -1367,6 +1386,7 @@
           styleConfig,
           headings: sectionHeadings,
           sectionOrder,
+          pageTarget,
         }),
       });
 
@@ -1378,12 +1398,11 @@
       }
 
       const pageCount = res.headers.get('X-Page-Count') || '1';
-      const isSinglePage = res.headers.get('X-Is-Single-Page') === 'true';
 
-      if (!isSinglePage) {
+      if (Number(pageCount) > pageTarget) {
         log(`[WARNING] Page budget exceeded: ${pageCount} pages generated!`, 'warn');
       } else {
-        log(`PDF compiled strictly within 1-page budget (${pageCount} page).`, 'success');
+        log(`PDF compiled within ${pageTarget}-page target (${pageCount} page).`, 'success');
       }
 
       const blob = await res.blob();
@@ -1421,13 +1440,14 @@
       };
       styleConfig = {
         fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard',
-        bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {},
+        bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {}, dateFormat: 'iso',
       };
       sectionHeadings = {
         SUMMARY: 'SUMMARY', EXPERIENCE: 'EXPERIENCE', EDUCATION: 'EDUCATION', SKILLS: 'SKILLS',
         CERTIFICATIONS: 'CERTIFICATIONS', PROJECTS: 'PROJECTS', REFERENCES: 'REFERENCES',
       };
       sectionOrder = [...DEFAULT_SECTION_ORDER];
+      pageTarget = 1;
       saveStateToStorage();
       populateContentForm();
       renderPreview();
@@ -1449,6 +1469,7 @@
       styleConfig,
       sectionHeadings,
       sectionOrder,
+      pageTarget,
       savedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
@@ -1492,7 +1513,7 @@
     }
     const styleDefaults = {
       fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard',
-      bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {},
+      bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {}, dateFormat: 'iso',
     };
     const nextStyle = { ...styleDefaults, ...(isLegacy ? {} : parsed.styleConfig), sectionScale: { ...(isLegacy ? {} : parsed.styleConfig?.sectionScale) } };
     if (!nextStyle
@@ -1501,6 +1522,7 @@
       || !['tight', 'standard', 'spacious'].includes(nextStyle.margins)
       || !['left', 'justify'].includes(nextStyle.bodyAlignment)
       || !['left', 'center'].includes(nextStyle.headerAlignment)
+      || !['iso', 'month-name'].includes(nextStyle.dateFormat)
       || Object.entries(nextStyle.sectionScale).some(([key, value]) =>
         !DEFAULT_SECTION_ORDER.includes(key)
         || ![0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15].includes(value))
@@ -1520,6 +1542,8 @@
       && requestedOrder.every((key) => legacyKeys.includes(key));
     if (!isValidSectionOrder(requestedOrder) && !isLegacyOrder) throw new Error('Invalid profile section order');
     const nextOrder = normalizeSectionOrder(requestedOrder);
+    const nextPageTarget = isLegacy ? 1 : (parsed.pageTarget ?? 1);
+    if (![1, 2].includes(nextPageTarget)) throw new Error('Invalid profile page target');
     return {
       isLegacy,
       draftResume: JSON.parse(JSON.stringify(resume)),
@@ -1527,6 +1551,7 @@
       styleConfig: { ...nextStyle },
       sectionHeadings: { ...nextHeadings },
       sectionOrder: [...nextOrder],
+      pageTarget: nextPageTarget,
     };
   }
 
@@ -1540,6 +1565,7 @@
         styleConfig: profile.styleConfig,
         headings: profile.sectionHeadings,
         sectionOrder: profile.sectionOrder,
+        pageTarget: profile.pageTarget,
       }),
     });
     if (!res.ok) {
@@ -1563,6 +1589,7 @@
         styleConfig = profile.styleConfig;
         sectionHeadings = profile.sectionHeadings;
         sectionOrder = profile.sectionOrder;
+        pageTarget = profile.pageTarget;
         saveStateToStorage();
         populateContentForm();
         await renderPreview();
@@ -1577,8 +1604,8 @@
 
   function updateBudgetIndicator(budget) {
     try {
-      const fill = budget.fullnessPercent;
-      const state = budget.pageCount > 1 ? 'overflow' : fill >= 85 ? 'near' : 'comfortable';
+      const fill = budget.targetFullnessPercent ?? budget.fullnessPercent / pageTarget;
+      const state = budget.pageCount > pageTarget ? 'overflow' : fill >= 85 ? 'near' : 'comfortable';
       if (budgetPercent) budgetPercent.textContent = `${Math.round(fill)}%`;
       if (budgetMeterFill) budgetMeterFill.style.width = `${Math.min(fill, 100)}%`;
       if (budgetMeter) budgetMeter.setAttribute('aria-valuenow', String(Math.min(Math.round(fill), 100)));
@@ -1586,7 +1613,7 @@
       if (budgetState) {
         budgetState.textContent = state === 'overflow'
           ? `Overflow — generated PDF has ${budget.pageCount} pages`
-          : state === 'near' ? 'Near the one-page limit' : 'Comfortable fit';
+          : state === 'near' ? `Near the ${pageTarget}-page target` : 'Comfortable fit';
       }
       setStatus('Document rendered in sandbox', `Page ${budget.pageCount}/${budget.pageCount}`);
       if (state !== currentBudgetState) {

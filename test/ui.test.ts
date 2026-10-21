@@ -51,6 +51,44 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('round-trips date display and page targets while preserving canonical dates', async () => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      expect(await page.locator('#select-date-format').count()).toBe(1);
+      expect(await page.locator('#select-page-target').inputValue()).toBe('1');
+      await page.locator('[data-tab="tab-design"]').click();
+      await page.locator('#select-date-format').selectOption('month-name');
+      await page.locator('#select-page-target').selectOption('2');
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#select-date-format').inputValue()).toBe('month-name');
+      expect(await page.locator('#select-page-target').inputValue()).toBe('2');
+      expect(await page.frameLocator('#preview-frame').locator('.item-meta').first().textContent()).toContain('Mar 2024');
+      const profile = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
+      expect(profile.pageTarget).toBe(2);
+      expect(profile.styleConfig.dateFormat).toBe('month-name');
+      expect(profile.draftResume.work[0].start).toBe('2024-03');
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.texts.unpdf).toContain('Mar 2024');
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each([{ pageTarget: 3 }, { styleConfig: { dateFormat: 'invalid' } }])('rejects malformed profile settings without replacing the draft: %j', async (patch) => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      await page.locator('[data-tab="tab-source"]').click();
+      const profile = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
+      profile.draftResume.basics.name = 'Must not replace the active draft';
+      Object.assign(profile, patch);
+      await page.locator('#input-import-json').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(profile)) });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Failed to import JSON'));
+      expect(await page.locator('#edit-name').inputValue()).toBe(resumeFixture.basics.name);
+      expect(await page.locator('#select-page-target').inputValue()).toBe('1');
+    } finally { await page.close(); }
+  }, 30000);
+
   it('edits and restores project evidence, rejecting unsafe links before PDF export', async () => {
     const page = await browser.newPage();
     try {

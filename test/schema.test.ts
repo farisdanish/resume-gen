@@ -29,6 +29,9 @@ describe('Phase 9 schemas', () => {
   test.each(['javascript:alert(1)', 'data:text/html,unsafe', 'file:///etc/passwd', 'not a URL'])('rejects unsafe project link %s', (link) => {
     expect(ProjectSchema.safeParse({ title: 'Project', description: 'Description', link }).success).toBe(false);
   });
+  test('rejects unknown date presentation formats', () => {
+    expect(StyleConfigSchema.safeParse({ dateFormat: 'locale' }).success).toBe(false);
+  });
   test('accepts bounded typography and alignment settings', () => {
     const result = StyleConfigSchema.safeParse({
       bodyAlignment: 'left',

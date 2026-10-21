@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SECTION_KEYS } from './constants';
 
 export const SectionKeySchema = z.enum(SECTION_KEYS);
+export const PageTargetSchema = z.union([z.literal(1), z.literal(2)]).default(1);
 
 // Tightly scoped: "YYYY" or "YYYY-MM" with valid calendar months 01-12
 export const DatePointSchema = z.string().regex(/^\d{4}(-(0[1-9]|1[0-2]))?$/, {
@@ -124,6 +125,7 @@ export const StyleConfigSchema = z
     margins: z.enum(['tight', 'standard', 'spacious']).default('standard'),
     bodyAlignment: z.enum(['left', 'justify']).default('justify'),
     headerAlignment: z.enum(['left', 'center']).default('left'),
+    dateFormat: z.enum(['iso', 'month-name']).default('iso'),
     sectionScale: z
       .partialRecord(SectionKeySchema, z.number().min(0.85).max(1.15).multipleOf(0.05))
       .default({}),
@@ -135,6 +137,7 @@ export const StyleConfigSchema = z
     margins: 'standard',
     bodyAlignment: 'justify',
     headerAlignment: 'left',
+    dateFormat: 'iso',
     sectionScale: {},
   });
 

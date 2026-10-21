@@ -1,7 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { parseDateRange, parseSingleDate } from '../src/date';
+import { renderResume } from '../src/render';
+import fixture from '../fixtures/pdf-compatibility.json';
 
 describe('Date Parser: Table-Driven Tests', () => {
+  it('renders month-name dates without mutating canonical dates or year-only values', () => {
+    const resume = structuredClone(fixture);
+    const original = JSON.stringify(resume);
+    const html = renderResume(resume, { styleConfig: { dateFormat: 'month-name' } });
+    expect(html.includes('Dec 2024')).toBe(true);
+    expect(html.includes('Mar 2023')).toBe(true);
+    expect(html.includes('Aug 2024')).toBe(true);
+    expect(html.includes('2018 – 2022')).toBe(true);
+    expect(html.includes('Present')).toBe(true);
+    expect(JSON.stringify(resume)).toBe(original);
+  });
   it('Baseline Site Format: "December 2024 – Present"', () => {
     expect(parseDateRange('December 2024 – Present')).toEqual({
       start: '2024-12',

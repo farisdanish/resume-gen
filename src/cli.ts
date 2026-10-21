@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
 import { runExtraction } from './extract';
-import { ResumeSchema } from './schema';
+import { ResumeSchema, StyleConfigSchema, PageTargetSchema } from './schema';
 import { renderResume } from './render';
 import { generatePdf } from './pdf';
 
@@ -15,11 +15,20 @@ program
   .option('-s, --source <source>', 'Data source: "live", "fixture", or file path', 'live')
   .option('-p, --phone <phone>', 'Phone override string')
   .option('-o, --out <path>', 'Output PDF path', 'out/resume.pdf')
+  .option('--date-format <format>', 'Date presentation: iso or month-name', 'iso')
+  .option('--page-target <pages>', 'Target page count: 1 or 2', '1')
   .option('--strict-pages', 'Exit with code 2 if output exceeds 1 page', false)
   .option('--strict-warnings', 'Exit with code 3 if DOM extraction produces warnings', false);
 
 program.action(async (options) => {
   try {
+    const styleValidation = StyleConfigSchema.safeParse({ dateFormat: options.dateFormat });
+    const targetValidation = PageTargetSchema.safeParse(Number(options.pageTarget));
+    if (!styleValidation.success || !targetValidation.success) {
+      console.error('[Error 1] Use --date-format iso|month-name and --page-target 1|2');
+      process.exit(1);
+    }
+    const pageTarget = targetValidation.data;
     const phoneOverride = options.phone || process.env.RESUME_PHONE;
 
     // 1. Data extraction
@@ -64,7 +73,7 @@ program.action(async (options) => {
     // 4. Render HTML
     let html: string;
     try {
-      html = renderResume(validResume);
+      html = renderResume(validResume, { styleConfig: styleValidation.data });
     } catch (err: any) {
       console.error(`[Error 4] Rendering failed: ${err.message}`);
       process.exit(4);
@@ -82,9 +91,9 @@ program.action(async (options) => {
     const { buffer, pageCount } = pdfResult;
 
     // 6. Strict page budget check (Exit Code 2)
-    if (options.strictPages && pageCount > 1) {
+    if (options.strictPages && pageCount > pageTarget) {
       console.error(
-        `[Error 2] Page budget exceeded: Resume generated ${pageCount} pages, but strict 1-page budget required.`
+        `[Error 2] Page budget exceeded: Resume generated ${pageCount} pages, but strict ${pageTarget}-page budget required.`
       );
       process.exit(2);
     }

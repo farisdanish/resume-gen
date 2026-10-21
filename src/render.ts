@@ -4,6 +4,7 @@ import path from 'node:path';
 import Handlebars from 'handlebars';
 import type { Resume, SectionOrder, StyleConfigInput } from './schema';
 import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS } from './constants';
+import { formatDisplayDate } from './date';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = path.resolve(__dirname, '../templates/fonts');
@@ -63,6 +64,11 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   `;
 
   const { styleConfig, headings = {}, sectionOrder = DEFAULT_SECTION_ORDER } = options;
+  const displayResume = {
+    ...resume,
+    work: resume.work.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
+    education: resume.education.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
+  };
 
   let dynamicOverrides = '';
   if (styleConfig) {
@@ -142,7 +148,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
 
   const orderedSections = sectionOrder.map((key) => ({
     key,
-    resume,
+    resume: displayResume,
     headings: resolvedHeadings,
     isSummary: key === 'summary',
     isExperience: key === 'experience',
@@ -154,7 +160,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   }));
 
   return template({
-    ...resume,
+    ...displayResume,
     headings: resolvedHeadings,
     orderedSections,
     inlinedStyles: `<style>${fontCss}\n${userStyles}\n${dynamicOverrides}</style>`,

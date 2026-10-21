@@ -8,6 +8,8 @@ import { ResumeSchema } from '../src/schema';
 import { renderResume } from '../src/render';
 import { generatePdf } from '../src/pdf';
 import resumeFixture from '../fixtures/resume.json';
+import compatibility from '../fixtures/pdf-compatibility.json';
+import { extractText } from 'unpdf';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -114,6 +116,24 @@ describe('Smoke Test Suite', () => {
   // SMOKE 3: Discrete CLI Exit Code Contract
   describe('SMOKE 3: CLI Exit Code Contract', () => {
     const cliScript = path.resolve(ROOT_DIR, 'src/cli.ts');
+
+    test.each([1, 2])('enforces explicit page target %i and supports month-name dates', async (target) => {
+      const input = path.join(SCRATCH_DIR, `target-${target}.json`);
+      const output = path.join(SCRATCH_DIR, `target-${target}.pdf`);
+      fs.writeFileSync(input, JSON.stringify({ ...compatibility, work: Array.from({ length: 20 }, () => compatibility.work[0]) }));
+      const result = await execa('npx', ['tsx', cliScript, '--source', input, '--out', output, '--date-format', 'month-name', '--page-target', String(target), '--strict-pages'], { cwd: ROOT_DIR, reject: false });
+      expect(result.exitCode).toBe(target === 1 ? 2 : 0);
+      if (target === 2) {
+        const { text } = await extractText(new Uint8Array(fs.readFileSync(output)), { mergePages: true });
+        expect(text).toContain('Dec 2024');
+        expect(text).toContain('Project sentinel: reliable production processing.');
+      }
+    }, 30000);
+
+    test.each([['--page-target', '3'], ['--date-format', 'invalid']])('rejects invalid CLI presentation option %s', async (flag, value) => {
+      const result = await execa('npx', ['tsx', cliScript, '--source', 'fixture', flag, value], { cwd: ROOT_DIR, reject: false });
+      expect(result.exitCode).toBe(1);
+    });
 
     test('Exit Code 0: Successful generation within 1-page budget', async () => {
       const outPath = path.resolve(SCRATCH_DIR, 'smoke-exit-0.pdf');
