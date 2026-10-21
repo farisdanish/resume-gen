@@ -10,14 +10,14 @@ export const program = new Command();
 
 program
   .name('resume-gen')
-  .description('Headless CLI to compile portfolio data into ATS-compliant PDF resume')
+  .description('Headless CLI to compile portfolio data into text-based A4 PDF resume')
   .version('1.0.0')
   .option('-s, --source <source>', 'Data source: "live", "fixture", or file path', 'live')
   .option('-p, --phone <phone>', 'Phone override string')
   .option('-o, --out <path>', 'Output PDF path', 'out/resume.pdf')
   .option('--date-format <format>', 'Date presentation: iso or month-name', 'iso')
   .option('--page-target <pages>', 'Target page count: 1 or 2', '1')
-  .option('--strict-pages', 'Exit with code 2 if output exceeds 1 page', false)
+  .option('--strict-pages', 'Exit with code 2 if output exceeds the selected page target', false)
   .option('--strict-warnings', 'Exit with code 3 if DOM extraction produces warnings', false);
 
 program.action(async (options) => {

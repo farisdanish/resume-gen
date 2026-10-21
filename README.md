@@ -1,8 +1,8 @@
 # resume-gen
 
-> Automated portfolio extraction and single-page ATS-compliant A4 PDF resume generator.
+> Portfolio extraction, resume editing, and text-based A4 PDF export with configurable page targets.
 
-`resume-gen` compiles live web portfolios (such as [farisantoni.com](https://farisantoni.com)) or offline HTML/JSON fixtures into a standardized, single-page A4 PDF resume. The system includes a headless CLI with discrete exit codes, an ATS text/ligature verification quality gate, and a vintage Office 2000 desktop web application powered by a loopback-bound Hono server.
+`resume-gen` compiles live web portfolios (such as [farisantoni.com](https://farisantoni.com)) or offline HTML/JSON fixtures into a customizable A4 PDF resume. The system includes a headless CLI with discrete exit codes, an ATS text/ligature verification quality gate, and a vintage Office 2000 desktop web application powered by a loopback-bound Hono server.
 
 ---
 
@@ -25,13 +25,13 @@ Live Web / Fixture (HTML/JSON)
           ▼
    Template Engine (src/render.ts)
    • Handlebars layout (templates/classic.hbs)
-   • Base64 inlined WOFF2 fonts (Inter, Source Serif 4)
+   • Base64 inlined static TTF fonts (Liberation Sans/Serif)
           │
           ▼
    PDF Engine (src/pdf.ts)
    • Playwright Chromium
    • document.fonts.ready sync
-   • pdf-lib strict 1-page budget guard
+   • pdf-lib actual page-count inspection
           │
      ┌────┴────────────────────────┐
      ▼                             ▼
@@ -44,9 +44,9 @@ Exit Codes: 0 to 4                 │
 
 ## Key Features
 
-- **Strict 1-Page A4 Budget**: Uses Playwright Chromium and `pdf-lib` to inspect the compiled page count. Exiting or alerting if content exceeds the single-page limit.
-- **ATS Quality Gate**: Uses `unpdf` to verify continuous linear text stream extraction, correct section hierarchy (`SUMMARY` → `EXPERIENCE` → `EDUCATION` → `SKILLS`), and preservation of typographical ligatures (`fi`, `fl`, `ff`).
-- **Self-Contained & Deterministic**: Zero external network font dependencies at render time. All fonts (`Inter`, `Source Serif 4`) are inlined as Base64 WOFF2 into the document stylesheet.
+- **Measured Page Targets**: Choose one or two pages. Playwright and `pdf-lib` report the actual PDF page count. UI export remains available beyond the target; CLI `--strict-pages` enforces it when requested.
+- **PDF Text Regression Checks**: Independent unpdf and Poppler checks cover literal phrases, dates, punctuation, reading order, page geometry, and hyperlink annotations across font/photo/alignment variants. These checks do not establish employer ATS approval.
+- **Self-Contained & Deterministic**: Zero external network font dependencies at render time. Static Liberation Sans/Serif fonts are bundled with their license and inlined as Base64 TTF into the document stylesheet.
 - **Discrete Exit Codes Contract**: Hardened CLI returning discrete exit codes (`0` to `4`) for CI/CD pipeline automation.
 - **Loopback-Only Server Security**: Local API server strictly binds to `127.0.0.1:3000` (never `0.0.0.0`).
 - **Sandboxed Live Preview**: Web UI renders the live resume strictly within an isolated `<iframe sandbox="" srcdoc="...">` to eliminate script execution and DOM leakage.
@@ -59,6 +59,7 @@ Exit Codes: 0 to 4                 │
 ### Prerequisites
 - Node.js 24.x or 22.x (22.12 or newer)
 - Playwright Chromium binaries
+- For tests: Poppler `pdftotext` (for example, `sudo apt-get install poppler-utils` on Debian/Ubuntu)
 
 ### Setup
 ```bash
@@ -98,16 +99,18 @@ npm run generate -- --source fixture --strict-pages --strict-warnings
 | `-s, --source <source>` | Data source: `"live"`, `"fixture"`, a URL, or local file path | `"live"` |
 | `-p, --phone <phone>` | Contact phone number override string | `RESUME_PHONE` env |
 | `-o, --out <path>` | Output PDF destination path | `"out/resume.pdf"` |
-| `--strict-pages` | Exits with code `2` if output exceeds 1 A4 page | `false` |
+| `--date-format` | `iso` or `month-name`; canonical input dates stay unchanged | `iso` |
+| `--page-target` | Target PDF page count, `1` or `2` | `1` |
+| `--strict-pages` | Exits with code `2` if output exceeds the selected target | `false` |
 | `--strict-warnings` | Exits with code `3` if DOM extraction produces selector warnings | `false` |
 
 ### Discrete Exit Codes Contract
 
 | Code | Meaning | Cause |
 | :---: | :--- | :--- |
-| **`0`** | **Success** | Resume compiled and written to output file within page budget. |
+| **`0`** | **Success** | Resume compiled and written to output file within the requested page target, when strict enforcement is enabled. |
 | **`1`** | **Schema Error** | Input data violated Zod schema validation (`ResumeSchema`). |
-| **`2`** | **Page Overflow** | Output exceeded 1 page while `--strict-pages` was enabled. |
+| **`2`** | **Page Overflow** | Output exceeded the selected target while `--strict-pages` was enabled. |
 | **`3`** | **DOM Warning** | Missing selectors produced warnings while `--strict-warnings` was enabled. |
 | **`4`** | **Operational Error** | Network fetch failure, missing file/fixture, or I/O permission error. |
 
@@ -126,7 +129,7 @@ Open **`http://127.0.0.1:3000`** in your browser.
 - **Data Sources**: Toggle between Local Fixture and Live Web with an editable URL input field.
 - **Contact Injection**: Live phone override input injected into `basics.contact.phone`.
 - **Live Preview**: Sandboxed preview `<iframe sandbox="" srcdoc="...">` updating on demand.
-- **Export**: One-click 1-page A4 PDF download.
+- **Export**: A4 PDF download with actual page counts and one/two-page target warnings.
 - **Diagnostics**: Retro status well displaying extraction metrics, warnings, and schema status.
 
 ---
@@ -137,8 +140,8 @@ The loopback server exposes the following REST endpoints:
 
 - `GET /api/health` — Returns server status and loopback binding information.
 - `POST /api/extract` — Accepts `{ source?: string, phoneOverride?: string }`, returns parsed resume JSON and extraction warnings.
-- `POST /api/preview` — Accepts `{ resume: Resume }`, returns `{ success: true, html: string, budget: { fullnessPercent: number, pageCount: number, isSinglePage: boolean } }`.
-- `POST /api/generate-pdf` — Accepts `{ resume: Resume }` or `{ html: string }`, returns binary `application/pdf` with `X-Page-Count` headers.
+- `POST /api/preview` — Accepts `{ resume: Resume, styleConfig?, pageTarget?: 1 | 2, headings?, sectionOrder? }`, returns `{ success: true, html: string, budget: { fullnessPercent: number, pageCount: number, isSinglePage: boolean, pageTarget: 1 | 2, withinTarget: boolean, targetFullnessPercent: number } }`.
+- `POST /api/generate-pdf` — Accepts `{ resume: Resume, styleConfig?, pageTarget?: 1 | 2, headings?, sectionOrder? }` or `{ html: string, pageTarget?: 1 | 2 }`, returns binary `application/pdf` with `X-Page-Count`, `X-Is-Single-Page`, `X-Page-Target`, and `X-Within-Target` headers.
 
 ---
 
@@ -152,6 +155,9 @@ npm run typecheck
 
 # Run all test suites (Vitest)
 npm test
+
+# Focused PDF compatibility gate (requires Chromium and pdftotext)
+npm run test:pdf-compat
 
 # Run individual test suites
 npx vitest run test/smoke.test.ts    # Fixture sanity, 1-page regression & exit codes
@@ -176,14 +182,14 @@ resume-gen/
 │   ├── constants.ts           # ATS section headings
 │   ├── date.ts                # Date range and keyword normalizer
 │   ├── extract.ts             # Cheerio DOM extractor
-│   ├── pdf.ts                 # Playwright & pdf-lib single-page PDF generator
+│   ├── pdf.ts                 # Playwright & pdf-lib A4 PDF generator
 │   ├── render.ts              # Handlebars renderer with Base64 font inliner
 │   ├── schema.ts              # Zod validation schemas
 │   └── server.ts              # Loopback Hono server (127.0.0.1:3000)
 ├── templates/
 │   ├── classic.hbs            # Resume Handlebars template
 │   ├── styles.css             # Print CSS & @page A4 rules
-│   └── fonts/                 # WOFF2 fonts (Inter, Source Serif 4)
+│   └── fonts/                 # Static TTF fonts, license, provenance, and retained legacy assets
 ├── test/
 │   ├── ats.test.ts            # ATS text order & ligature validation
 │   ├── date.test.ts           # Date parser table-driven test suite
@@ -215,9 +221,36 @@ Preview measurement runs in Chromium and can take longer than HTML compilation.
 Browser work has a 15-second deadline; preview requests time out after 20 seconds.
 Pending or failed previews show the budget as unavailable, and older responses
 cannot replace newer edits. PDF export still permits multiple pages and reports
-their actual count. Saved profiles and the iframe sandbox are unchanged.
+their actual count. Legacy profile files remain supported and the iframe keeps its existing isolation.
 
 ---
+
+## Authoring, compatibility, and verification
+
+- **Project evidence:** Content includes editable stacks and optional visible project URLs. Stack input is comma-separated; empty tokens are discarded. Links must be absolute HTTP(S) URLs. Unsafe schemes are rejected in profiles/API requests. Project links are rendered as text and PDF URI annotations; hidden projects contribute neither. URLs are not fetched by the server.
+- **Header:** identity fields wrap on one row group; GitHub/LinkedIn/Website use a dedicated row. Photo inclusion is independent of project/reference inclusion. Long input can still increase document height.
+- **Date display:** Design offers ISO or English month names. `YYYY-MM`, bare years, and null end dates remain canonical in JSON; formatting does not mutate them.
+- **Page target:** Design offers 1 or 2 pages. `budget.fullnessPercent` retains its one-page geometric meaning for API compatibility; `targetFullnessPercent` divides that by the target. Overflow uses actual PDF page count, not a percentage guess. Page breaks can make geometric fullness differ from actual pagination. Export never silently deletes or shrinks content.
+- **Named variants:** Source → Saved Profiles saves snapshots of your own content, visibility, styling, order, and page target. Suggested names do not generate or rewrite achievements. Names are unique case-insensitively (1–80 characters); replacing a duplicate requires Update Saved Profile. Loading asks before replacing unmatched edits, including after reload. Save Profile/Load Profile still download/upload portable JSON.
+- **Local persistence:** active draft uses `resume_gen_draft_v1`; named snapshots use independent `resume_gen_profiles_v1` storage. Profiles are browser-local and do not sync. Quota/corrupt-library failures show an error and preserve existing snapshots. Keep portable JSON backups, especially with photos. Previously accepted non-HTTP(S) project links must be corrected before importing into this version.
+- **Backward compatibility:** version 1 bundles and legacy raw resume JSON still load. Missing date format/page target defaults to `iso`/1. New fields are additive; no database migration is required.
+- **Font change:** internal font-pairing IDs stay the same, but exports now embed static Liberation Sans/Serif TTF files. Font provenance, package version, hashes and SIL OFL license are in `templates/fonts/`. Legacy WOFF2 files are intentionally retained for rollback. Text wrapping, PDF size, and page counts can change. Short percentage ranges remain atomic text runs; their source Unicode is preserved and all prose is HTML-escaped.
+- **Limits:** Data: Ready means extraction data was loaded successfully. PDF parsing regression checks, metadata, or an untagged PDF do not establish a score or guarantee in a real employer ATS. Accessibility tagging and live employer-ATS qualification remain separate work.
+
+### Smoke tests after every phase
+
+Every implementation phase has a smoke checkpoint before the next phase proceeds:
+
+1. Fonts: export photo/no-photo fixtures; run both parsers and the semantic matrix; inspect rendered PDFs and existing CLI smoke behavior.
+2. Project/header: edit and persist stack/link, reject unsafe URLs, toggle photo/project visibility, download PDF, and inspect URI annotations and contact layout.
+3. Dates/targets: round-trip settings and old profiles; compare one/two/three-page API/PDF results; exercise strict CLI targets and invalid values.
+4. Named variants: save/load independent drafts, explicit duplicate update, dirty-switch cancellation/reload, portable JSON/PDF export, and corrupt/quota-failed storage.
+5. Final: full tests, typecheck, JS syntax and diff checks; extraction → editing → settings/profile changes → preview → PDF download; render every page of representative one/two/overflow-page PDFs.
+
+Continuation pages currently retain the existing print-margin behavior: text can begin near the page edge. Repeated print margins are a separate layout refinement; no clipping was observed in the inspected smoke PDFs.
+
+The known loopback test currently uses a substring match that can confuse port 3000 with unrelated ports such as 30007. Report that baseline failure separately; do not skip or weaken the assertion to make this release green.
+
 
 ## License
 

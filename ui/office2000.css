@@ -926,3 +926,4 @@ html, body {
 .named-profile-editor .win-input { width: 100%; min-width: 0; }
 .named-profile-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 #profile-library-message { font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
+#select-date-format, #select-page-target { display: block; width: 100%; margin-bottom: 6px; }

@@ -37,19 +37,21 @@ describe('ATS Validation Test', () => {
     for (const raw of Object.values(result.texts)) {
       const text = raw.replace(/\r\n/g, '\n').replace(/\n/g, ' ');
       expect(text).not.toMatch(/[\uE000-\uF8FF\uFFFD]/);
+      expect(text.slice(0, text.indexOf('SUMMARY'))).toContain('Software Engineer');
       const summary = text.slice(text.indexOf('SUMMARY'), text.indexOf('EXPERIENCE'));
       for (const phrase of ['Backend Software Engineer', 'production Laravel', 'MongoDB', 'PostgreSQL', 'Kota Kinabalu', '80–90%', '80-90%', 'PHP↔Python (interop)']) expect(summary).toContain(phrase);
       expect(text).toContain('+60 10 1234567');
       const alpha = text.indexOf('Alpha Systems');
       const beta = text.indexOf('Beta Labs');
       expect(alpha).toBeGreaterThan(0);
+      expect(text.indexOf('Platform Engineer')).toBeGreaterThan(alpha);
       expect(text.slice(alpha, beta)).toContain('2024-12');
       expect(text.slice(beta, text.indexOf('EDUCATION'))).toContain('2023-03');
       expect(text).toContain('Project sentinel: reliable production processing.');
     }
     for (const page of result.pages) {
-      expect(page.width).toBeCloseTo(595, -1);
-      expect(page.height).toBeCloseTo(842, -1);
+      expect(page.width).toBeCloseTo(595, 0);
+      expect(page.height).toBeCloseTo(842, 0);
     }
     expect(result.urls).toContain('https://github.com/alexmorgan-example');
   }, 30000);

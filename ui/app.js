@@ -500,6 +500,7 @@
 
   // --- Storage & State Management ---
   function saveStateToStorage() {
+    if (!draftResume) return false;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(currentProfileBundle()));
       return true;
@@ -1377,7 +1378,7 @@
         }
         setStatus('Extraction failed', 'Error');
         if (statusAtsBadge) {
-          statusAtsBadge.textContent = 'ATS: Error';
+          statusAtsBadge.textContent = 'Data: Error';
           statusAtsBadge.className = 'status-badge badge-error';
         }
         return;
@@ -1398,7 +1399,7 @@
       }
 
       if (statusAtsBadge) {
-        statusAtsBadge.textContent = 'ATS: Ready';
+        statusAtsBadge.textContent = 'Data: Ready';
         statusAtsBadge.className = 'status-badge badge-ok';
       }
 

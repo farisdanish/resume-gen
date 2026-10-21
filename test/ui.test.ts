@@ -51,6 +51,41 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('protects the saved draft when settings change before extraction finishes', async () => {
+    const page = await browser.newPage();
+    let release!: () => void;
+    try {
+      await openProjectEditor(page);
+      const stored = await page.evaluate(() => localStorage.getItem('resume_gen_draft_v1'));
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      await page.route('**/api/extract', async (route) => {
+        const response = await route.fetch();
+        await gate;
+        await route.fulfill({ response }).catch(() => {});
+      });
+      await page.reload();
+      await page.locator('[data-tab="tab-design"]').click();
+      await page.locator('#select-date-format').selectOption('month-name');
+      expect(await page.evaluate(() => localStorage.getItem('resume_gen_draft_v1'))).toBe(stored);
+    } finally {
+      release?.();
+      await page.unrouteAll({ behavior: 'wait' });
+      await page.close();
+    }
+  }, 30000);
+
+  it('reports data readiness without claiming ATS approval and explains the new controls in Help', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      expect(await page.locator('#status-ats-badge').textContent()).toBe('Data: Ready');
+      await page.locator('#menu-help').click();
+      await page.getByRole('menuitem', { name: 'Help Topics…' }).click();
+      const topics = await page.getByRole('dialog', { name: 'Help Topics' }).textContent();
+      for (const phrase of ['Saved Profiles', 'date display', 'page target', 'project links']) expect(topics).toContain(phrase);
+    } finally { await page.close(); }
+  }, 30000);
+
   it('isolates named profiles, confirms dirty switches, and restores a saved PDF after reload', async () => {
     const page = await browser.newPage();
     try {
