@@ -31,7 +31,17 @@
       <div class="menu-item" id="menu-tools"><u>T</u>ools</div>
       <div class="menu-item" id="menu-table">Ta<u>b</u>le</div>
       <div class="menu-item" id="menu-window"><u>W</u>indow</div>
-      <div class="menu-item" id="menu-help"><u>H</u>elp</div>
+      <div class="help-menu">
+        <button type="button" class="menu-item help-menu-trigger" id="menu-help"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="help-dropdown"><u>H</u>elp</button>
+        <div class="help-dropdown bevel-outset" id="help-dropdown" role="menu" aria-label="Help" hidden>
+          <button type="button" role="menuitem" tabindex="-1" data-help-dialog="help-topics">Help Topics…</button>
+          <a role="menuitem" tabindex="-1" href="https://github.com/farisdanish/resume-gen/issues/new"
+            target="_blank" rel="noopener noreferrer">Report an Issue…</a>
+          <div class="help-menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" tabindex="-1" data-help-dialog="help-about">About Resume Generator…</button>
+        </div>
+      </div>
     </nav>
 
     <!-- 3. Standard Toolbar -->
@@ -504,6 +514,46 @@
       <div class="status-cell" id="status-host">127.0.0.1:3000</div>
     </footer>
   </div>
+
+  <dialog id="help-topics" class="help-dialog bevel-outset" aria-labelledby="help-topics-title">
+    <div class="win-titlebar">
+      <h2 id="help-topics-title">Help Topics</h2>
+      <button type="button" class="win-btn-control" data-close-help aria-label="Close Help Topics">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <p class="help-intro">Your résumé, from first draft to PDF.</p>
+      <dl class="help-topics-list">
+        <dt>1. Extract your starting content</dt>
+        <dd>In Source, choose Local Fixture for sample content or Live Web for your portfolio URL, then select Extract Resume DOM.</dd>
+        <dt>2. Edit in Content</dt>
+        <dd>Update your details, work highlights, skills, and project descriptions. Use inclusion checkboxes to choose what appears.</dd>
+        <dt>3. Choose a Design</dt>
+        <dd>Adjust fonts, accent color, density, margins, alignment, and section sizes. In Sections, rename headings or change their order.</dd>
+        <dt>4. Watch the page budget</dt>
+        <dd>Changes refresh the preview automatically. The budget measures your content and checks the PDF page count. If it overflows, shorten text, hide an item, or try Compact density and Tight margins. The preview displays the first page; export the PDF to inspect all pages.</dd>
+        <dt>5. Save Profile for later</dt>
+        <dd>Save Profile downloads your content and settings as JSON. Load Profile restores it. Your browser also saves your draft locally.</dd>
+        <dt>6. Export your PDF</dt>
+        <dd>Select Export PDF in the toolbar or the export button in Source. Check the downloaded file before sharing it; an export can contain more than one page.</dd>
+      </dl>
+      <p>Need to report a problem? Choose Help → Report an Issue. Describe your steps and what you expected. Avoid including private résumé information.</p>
+    </div>
+    <div class="help-dialog-actions"><button type="button" class="win-button" data-close-help autofocus>OK</button></div>
+  </dialog>
+
+  <dialog id="help-about" class="help-dialog bevel-outset" aria-labelledby="help-about-title">
+    <div class="win-titlebar">
+      <h2 id="help-about-title">About Resume Generator</h2>
+      <button type="button" class="win-btn-control" data-close-help aria-label="Close About Resume Generator">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <div class="help-about-heading"><span class="win-icon" aria-hidden="true">W</span><strong>Resume Generator</strong></div>
+      <p>Version 1.0.0</p>
+      <p>An Office 2000-inspired editor for turning portfolio content into an A4 résumé. Customize your draft, check its page budget, and export a PDF.</p>
+      <p><a href="https://github.com/farisdanish/resume-gen" target="_blank" rel="noopener noreferrer">View the project on GitHub</a></p>
+    </div>
+    <div class="help-dialog-actions"><button type="button" class="win-button" data-close-help autofocus>OK</button></div>
+  </dialog>
 
   <script src="/app.js"></script>
 </body>

@@ -158,6 +158,67 @@
   let previewRevision = 0;
   let previewController = null;
 
+  // Help is a local menu; external links never include draft content.
+  const helpTrigger = document.getElementById('menu-help');
+  const helpDropdown = document.getElementById('help-dropdown');
+  const helpItems = Array.from(helpDropdown.querySelectorAll('[role="menuitem"]'));
+
+  function closeHelpMenu(restoreFocus = false) {
+    helpDropdown.hidden = true;
+    helpTrigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) helpTrigger.focus();
+  }
+
+  function openHelpMenu(index = 0) {
+    helpDropdown.hidden = false;
+    helpTrigger.setAttribute('aria-expanded', 'true');
+    helpItems[index].focus();
+  }
+
+  helpTrigger.addEventListener('click', () => {
+    if (helpDropdown.hidden) openHelpMenu();
+    else closeHelpMenu(true);
+  });
+  helpTrigger.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openHelpMenu(event.key === 'ArrowUp' ? helpItems.length - 1 : 0);
+    }
+  });
+  helpDropdown.addEventListener('keydown', (event) => {
+    const index = helpItems.indexOf(document.activeElement);
+    let next;
+    if (event.key === 'ArrowDown') next = (index + 1) % helpItems.length;
+    if (event.key === 'ArrowUp') next = (index - 1 + helpItems.length) % helpItems.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = helpItems.length - 1;
+    if (next !== undefined) {
+      event.preventDefault();
+      helpItems[next].focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeHelpMenu(true);
+    } else if (event.key === 'Tab') {
+      closeHelpMenu(true);
+    } else if (event.key === ' ' && document.activeElement?.tagName === 'A') {
+      event.preventDefault();
+      document.activeElement.click();
+    }
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!helpTrigger.parentElement.contains(event.target)) closeHelpMenu();
+  });
+  helpItems.forEach((item) => item.addEventListener('click', () => {
+    closeHelpMenu(true);
+    if (item.dataset.helpDialog) document.getElementById(item.dataset.helpDialog).showModal();
+  }));
+  document.querySelectorAll('.help-dialog').forEach((dialog) => {
+    dialog.querySelectorAll('[data-close-help]').forEach((button) => {
+      button.addEventListener('click', () => dialog.close());
+    });
+    dialog.addEventListener('close', () => helpTrigger.focus());
+  });
+
   function invalidatePreview() {
     previewRevision += 1;
     previewController?.abort();

@@ -50,6 +50,74 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('opens the Help menu by mouse and dismisses it outside or with Escape', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const help = page.locator('#menu-help');
+      await help.click();
+      expect(await help.getAttribute('aria-expanded')).toBe('true');
+      expect(await page.getByRole('menu', { name: 'Help' }).isVisible()).toBe(true);
+      await page.locator('.win-title-text').click();
+      expect(await help.getAttribute('aria-expanded')).toBe('false');
+      await help.click();
+      await page.keyboard.press('Escape');
+      expect(await page.getByRole('menu', { name: 'Help' }).isVisible()).toBe(false);
+      expect(await help.evaluate((el) => document.activeElement === el)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('navigates Help by keyboard and restores focus after Help and About dialogs', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const help = page.locator('#menu-help');
+      await help.focus();
+      await page.keyboard.press('Enter');
+      expect(await page.getByRole('menuitem', { name: 'Help Topics…' }).evaluate((el) => document.activeElement === el)).toBe(true);
+      await page.keyboard.press('ArrowUp');
+      expect(await page.getByRole('menuitem', { name: 'About Resume Generator…' }).evaluate((el) => document.activeElement === el)).toBe(true);
+      await page.keyboard.press('Enter');
+      const about = page.getByRole('dialog', { name: 'About Resume Generator' });
+      expect(await about.isVisible()).toBe(true);
+      expect(await about.textContent()).toContain('1.0.0');
+      await page.keyboard.press('Escape');
+      expect(await about.isVisible()).toBe(false);
+      expect(await help.evaluate((el) => document.activeElement === el)).toBe(true);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      expect(await page.getByRole('menuitem', { name: 'Report an Issue…' }).evaluate((el) => document.activeElement === el)).toBe(true);
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Enter');
+      const topics = page.getByRole('dialog', { name: 'Help Topics' });
+      expect(await topics.isVisible()).toBe(true);
+      for (const topic of ['Extract', 'Content', 'Design', 'budget', 'Save Profile', 'PDF']) {
+        expect(await topics.textContent()).toContain(topic);
+      }
+      await topics.getByRole('button', { name: 'OK', exact: true }).click();
+      expect(await help.evaluate((el) => document.activeElement === el)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('opens the issue composer in a separate tab without including resume data', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.context().route('https://github.com/**', (route) => route.fulfill({ status: 200, body: 'GitHub issue composer' }));
+      await page.locator('#menu-help').click();
+      const issue = page.getByRole('menuitem', { name: 'Report an Issue…' });
+      expect(await issue.getAttribute('rel')).toContain('noopener');
+      expect(await issue.getAttribute('rel')).toContain('noreferrer');
+      const opening = page.waitForEvent('popup');
+      await issue.click();
+      const popup = await opening;
+      await popup.waitForLoadState();
+      expect(popup.url()).toBe('https://github.com/farisdanish/resume-gen/issues/new');
+      expect(await page.locator('#menu-help').getAttribute('aria-expanded')).toBe('false');
+      await popup.close();
+    } finally { await page.close(); }
+  }, 30000);
+
   it('edits only the selected project, renders plain text, and exports the updated PDF and budget', async () => {
     const page = await browser.newPage();
     try {
