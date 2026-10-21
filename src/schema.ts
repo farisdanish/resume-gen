@@ -62,7 +62,7 @@ export const ProjectSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   stack: z.array(z.string()).default([]),
-  link: z.string().url().optional(),
+  link: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an absolute HTTP or HTTPS URL').optional(),
 });
 
 export const ReferenceSchema = z

@@ -302,3 +302,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 .reference-name { font-weight: 700; }
 .reference-contact { color: #4a5568; }
+
+/* Keep profile links on their own predictable row, independent of identity wrapping. */
+.contact-identity .contact-item { min-width: 0; overflow-wrap: anywhere; }
+.contact-item + .contact-item::before { content: '•'; color: #cbd5e0; margin-right: 8pt; }
+.contact-links { flex-wrap: nowrap; margin-top: 3pt; }
+.contact-links:empty { display: none; }
+.contact-links .contact-item { white-space: nowrap; }
+.project-link { font-size: calc(var(--font-base-size) * 8 / 8.5); overflow-wrap: anywhere; }
+.project-link a { color: #4a5568; text-decoration: underline; }

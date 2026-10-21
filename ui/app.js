@@ -803,10 +803,30 @@
           <label class="form-label" for="project-description-${projIdx}">Description:</label>
           <textarea id="project-description-${projIdx}" class="win-textarea input-project-description" rows="3"
             aria-describedby="project-description-error-${projIdx}"></textarea>
+          <label class="form-label" for="project-stack-${projIdx}">Stack (comma-separated):</label>
+          <input id="project-stack-${projIdx}" class="win-input input-project-stack" type="text" style="width: 100%;">
+          <label class="form-label" for="project-link-${projIdx}">Project Link (optional):</label>
+          <input id="project-link-${projIdx}" class="win-input input-project-link" type="url" style="width: 100%;" aria-describedby="project-link-error-${projIdx}">
+          <div id="project-link-error-${projIdx}" role="alert" hidden>Use an absolute http:// or https:// URL, or leave this blank.</div>
           <div id="project-description-error-${projIdx}" role="alert" hidden>
             Enter a description before including this project.
           </div>
         `;
+        const stack = div.querySelector('.input-project-stack');
+        const link = div.querySelector('.input-project-link');
+        stack.value = (proj.stack || []).join(', ');
+        link.value = proj.link || '';
+        stack.addEventListener('input', () => {
+          proj.stack = stack.value.split(',').map((item) => item.trim()).filter(Boolean);
+          scheduleDebouncedPreview();
+        });
+        link.addEventListener('input', () => {
+          const value = link.value.trim();
+          if (value) proj.link = value;
+          else delete proj.link;
+          updateValidation();
+          scheduleDebouncedPreview();
+        });
         const description = div.querySelector('.input-project-description');
         const descriptionError = div.querySelector(`#project-description-error-${projIdx}`);
         description.value = proj.description || '';
@@ -816,6 +836,9 @@
           description.required = included;
           description.setAttribute('aria-invalid', String(invalid));
           descriptionError.hidden = !invalid;
+          const invalidLink = included && Boolean(link.value.trim()) && !isSafeProjectLink(link.value.trim());
+          link.setAttribute('aria-invalid', String(invalidLink));
+          div.querySelector(`#project-link-error-${projIdx}`).hidden = !invalidLink;
         };
         updateValidation();
         description.addEventListener('input', (e) => {
@@ -1237,7 +1260,17 @@
     }
   }
 
+  function isSafeProjectLink(value) {
+    try { return ['http:', 'https:'].includes(new URL(value).protocol) && /^https?:\/\//i.test(value); }
+    catch { return false; }
+  }
+
   function validateProjectDescriptions(resume) {
+    if ((resume.projects || []).some((project) => project.link && !isSafeProjectLink(project.link))) {
+      setBudgetUnavailable('Budget unavailable — preview is out of date');
+      setStatus('Valid project link required', 'Not measured');
+      return false;
+    }
     if ((resume.projects || []).some((project) => !project.description?.trim())) {
       setBudgetUnavailable('Budget unavailable — preview is out of date');
       setStatus('Project description required', 'Not measured');

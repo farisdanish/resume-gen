@@ -93,4 +93,20 @@ describe('Design application and measured budget', () => {
       await new Promise<void>((resolve) => imageServer.close(() => resolve()));
     }
   }, 20000);
+
+  it.each(['left', 'right'] as const)('keeps photo profile links together at %s with all projects present', async (position) => {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(renderResume({ ...resume, basics: { ...resume.basics,
+        contact: { ...resume.basics.contact, location: 'A long location in Kota Kinabalu, Sabah, Malaysia' },
+        headshot: { dataUri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', shape: position === 'left' ? 'circle' : 'rounded', position },
+      } }));
+      await page.evaluate(() => document.fonts.ready);
+      expect(await page.locator('.contact-links a').count()).toBe(3);
+      const tops = await page.locator('.contact-links a').evaluateAll((links) => links.map((el) => el.getBoundingClientRect().top));
+      expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
+      expect(await page.locator('.project-item').count()).toBe(resume.projects.length);
+      expect(await page.locator('.header-copy').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    } finally { await page.close(); }
+  });
 });

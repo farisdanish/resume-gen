@@ -5,6 +5,7 @@ import type { Server } from 'node:http';
 import { PDFDocument } from 'pdf-lib';
 import { extractText } from 'unpdf';
 import resumeFixture from '../fixtures/resume.json';
+import { inspectPdf } from './helpers/pdf-checks';
 
 describe('Editor preview and budget flow', () => {
   let server: Server;
@@ -49,6 +50,34 @@ describe('Editor preview and budget flow', () => {
     for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
     return Buffer.concat(chunks);
   }
+
+  it('edits and restores project evidence, rejecting unsafe links before PDF export', async () => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      expect(await page.locator('.input-project-link').count()).toBe(2);
+      await page.locator('.input-project-stack').first().fill('PHP, Laravel, , PostgreSQL');
+      await page.locator('.input-project-link').first().fill('javascript:alert(1)');
+      await page.waitForFunction(() => document.querySelector('.input-project-link')?.getAttribute('aria-invalid') === 'true');
+      expect(await page.locator('#budget-percent').textContent()).toBe('—');
+      const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
+      await page.locator('.input-project-link').first().fill('https://example.com/project');
+      await response;
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('.input-project-link').first().inputValue()).toBe('https://example.com/project');
+      expect(await page.frameLocator('#preview-frame').locator('.project-item').first().textContent()).toContain('PHP, Laravel, PostgreSQL');
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.urls).toContain('https://example.com/project');
+      expect(pdf.texts.unpdf).toContain('https://example.com/project');
+      await page.locator('[data-tab="tab-content"]').click();
+      const clearing = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
+      await page.locator('.input-project-link').first().fill('');
+      await clearing;
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.frameLocator('#preview-frame').locator('.project-link').count()).toBe(0);
+    } finally { await page.close(); }
+  }, 30000);
 
   it('opens the Help menu by mouse and dismisses it outside or with Escape', async () => {
     const page = await browser.newPage();
