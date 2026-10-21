@@ -65,6 +65,18 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
       font-weight: 700;
       font-style: normal;
     }
+    @font-face {
+      font-family: 'ResumeCalibri';
+      src: url('data:font/ttf;base64,${loadBase64Font('Carlito-Regular.ttf')}') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'ResumeCalibri';
+      src: url('data:font/ttf;base64,${loadBase64Font('Carlito-Bold.ttf')}') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
   `;
 
   const { styleConfig, headings = {}, sectionOrder = DEFAULT_SECTION_ORDER } = options;
@@ -79,8 +91,9 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   if (styleConfig) {
     const accent = styleConfig.accentColor || '#2b6cb0';
 
-    let fontHeading = "'ResumeSerif', Georgia, serif";
-    let fontBody = "'ResumeSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    // Retain persisted IDs; each choice now uses one family throughout the resume.
+    let fontHeading = "'ResumeCalibri', sans-serif";
+    let fontBody = "'ResumeCalibri', sans-serif";
 
     if (styleConfig.fontPairing === 'modern') {
       fontHeading = "'ResumeSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";

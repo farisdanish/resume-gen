@@ -51,6 +51,42 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  // Catches misleading font labels and losing a selected family in saved profiles.
+  it('traditional font selector names substitutes and persists the three choices', async () => {
+    const page = await browser.newPage();
+    try {
+      await openProjectEditor(page);
+      expect(await page.locator('#select-font-pairing option').allTextContents()).toEqual([
+        'Arial-style (Liberation Sans)', 'Calibri-style (Carlito)', 'Times New Roman-style (Liberation Serif)',
+      ]);
+      await page.locator('[data-tab="tab-design"]').click();
+      for (const [value, family] of [['modern', 'ResumeSans'], ['editorial', 'ResumeCalibri'], ['serif', 'ResumeSerif']]) {
+        const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
+        await page.locator('#select-font-pairing').selectOption(value);
+        await response;
+        await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+        expect(await page.frameLocator('#preview-frame').locator('.summary-text').evaluate((el) => getComputedStyle(el).fontFamily)).toContain(family);
+      }
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      expect(await page.locator('#select-font-pairing').inputValue()).toBe('serif');
+      const portable = await downloadedBytes(page, '#btn-export-json');
+      expect(JSON.parse(portable.toString()).styleConfig.fontPairing).toBe('serif');
+      await page.locator('#profile-name').fill('Traditional font');
+      await page.locator('#btn-save-named-profile').click();
+      await page.locator('[data-tab="tab-design"]').click();
+      await page.locator('#select-font-pairing').selectOption('modern');
+      await page.locator('[data-tab="tab-source"]').click();
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.locator('#btn-load-named-profile').click();
+      await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Loaded Traditional font.');
+      expect(await page.locator('#select-font-pairing').inputValue()).toBe('serif');
+      await page.locator('#input-import-json').setInputFiles({ name: 'font.json', mimeType: 'application/json', buffer: portable });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Restored complete tailored profile'));
+      expect(await page.locator('#select-font-pairing').inputValue()).toBe('serif');
+    } finally { await page.close(); }
+  }, 60000);
+
   // Catches stale shrink-text advice when switching between two overflowing layouts.
   it('refreshes readable overflow advice even when the budget state stays overflow', async () => {
     const page = await browser.newPage();

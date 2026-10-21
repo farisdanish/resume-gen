@@ -6,11 +6,47 @@ import resume from '../fixtures/resume.json';
 import { createServer } from 'node:http';
 import compatibility from '../fixtures/pdf-compatibility.json';
 import { inspectPdf } from './helpers/pdf-checks';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 
 describe('Design application and measured budget', () => {
   let browser: Browser;
   beforeAll(async () => { browser = await chromium.launch({ headless: true }); });
   afterAll(async () => { await browser?.close(); });
+
+  // Catches a font choice rendering as a mixture or silently exporting a different family.
+  it.each([
+    ['modern', 'ResumeSans', 'LiberationSans'],
+    ['editorial', 'ResumeCalibri', 'Carlito'],
+    ['serif', 'ResumeSerif', 'LiberationSerif'],
+  ] as const)('traditional font exports use one family for %s', async (fontPairing, family, pdfFamily) => {
+    const page = await browser.newPage();
+    try {
+      const html = renderResume(compatibility, { styleConfig: { fontPairing, bodyFontSize: 11 } });
+      await page.setContent(html);
+      await page.evaluate(() => document.fonts.ready);
+      for (const selector of ['.candidate-name', '.section-heading', '.summary-text', '.highlight-list li']) {
+        expect(await page.locator(selector).first().evaluate((el) => getComputedStyle(el).fontFamily.split(',')[0].replace(/['"]/g, '').trim())).toBe(family);
+      }
+      const { buffer } = await generatePdf({ html });
+      const pdf = await PDFDocument.load(buffer);
+      const names: string[] = [];
+      for (const sheet of pdf.getPages()) {
+        const fonts = sheet.node.Resources()?.lookupMaybe(PDFName.of('Font'), PDFDict);
+        for (const [, ref] of fonts?.entries() || []) {
+          const font = pdf.context.lookup(ref, PDFDict);
+          names.push(font.lookup(PDFName.of('BaseFont'), PDFName).decodeText());
+        }
+      }
+      expect(names.length).toBeGreaterThanOrEqual(2);
+      expect(names.every((name) => name.includes(pdfFamily))).toBe(true);
+      const result = await inspectPdf(buffer);
+      for (const raw of Object.values(result.texts)) {
+        const text = raw.replace(/\s+/g, ' ');
+        for (const phrase of ['Backend Software Engineer', '2024-12', '80–90%', 'Kota Kinabalu']) expect(text).toContain(phrase);
+        expect(text).not.toMatch(/[\uE000-\uF8FF\uFFFD]/);
+      }
+    } finally { await page.close(); }
+  }, 30000);
 
   // Catches small bullets/metadata and section zoom bypassing the 10 pt floor.
   it.each([10, 11, 12] as const)('readable-effective-font-sizes respects size %i and section-scale floors', async (bodyFontSize) => {

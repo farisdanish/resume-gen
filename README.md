@@ -7,6 +7,7 @@
 - Edit contact details, summaries, experience, skills, project descriptions, technology stacks, links and references.
 - Include or hide individual entries, rename section headings and change section order.
 - Adjust fonts, colours, margins, alignment, spacing and section sizes; optionally include a photo.
+- Choose Arial-style (Liberation Sans), Calibri-style (Carlito), or Times New Roman-style (Liberation Serif), with the selected family used throughout the resume.
 - Apply an 11 pt readable preset or select 10, 11 or 12 pt body text.
 - Choose ISO or month-name dates and a one- or two-page target, with overflow warnings based on the exported PDF's page count.
 - Preview changes, download PDFs, and save named profiles locally or import/export profiles as JSON.
@@ -111,7 +112,7 @@ Tests require Playwright Chromium and Poppler's `pdftotext` command (`poppler-ut
 
 ## Changelog
 
-Added readable typography, improved PDF word and contact extraction, and repeated margins on readable exports.
+Replaced the three font combinations with clearly labelled Arial-style, Calibri-style and Times New Roman-style open-source font choices.
 
 ## License
 

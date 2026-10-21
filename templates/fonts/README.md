@@ -13,3 +13,15 @@ SHA-256:
 - `LiberationSerif-Bold.ttf`: `bb033fae52dcbf67a55494a08829aaa788324624d72a195af7f93da3061c928f`
 
 The legacy WOFF2 files are retained for rollback; exports embed the static TTF assets.
+
+## Carlito
+
+Unmodified regular and bold fonts from the local Debian fonts-crosextra-carlito package.
+Package version: 20230309-2
+Upstream: https://github.com/googlefonts/carlito
+License: SIL Open Font License 1.1 (see LICENSE-Carlito.txt).
+
+- `Carlito-Regular.ttf`: `f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595`
+- `Carlito-Bold.ttf`: `bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db`
+
+The three single-family export choices use Liberation Sans for Arial-style, Carlito for Calibri-style, and Liberation Serif for Times New Roman-style. Labels identify the actual bundled substitutes; Microsoft font files are not included.

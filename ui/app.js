@@ -619,6 +619,7 @@
 
     // Design & Theme controls
     if (selectFontPairing) selectFontPairing.value = styleConfig.fontPairing || 'editorial';
+    updateToolbarFont();
     if (selectDateFormat) selectDateFormat.value = styleConfig.dateFormat || 'iso';
     if (selectPageTarget) selectPageTarget.value = String(pageTarget);
     const budgetLabel = document.getElementById('budget-label');
@@ -1106,6 +1107,11 @@
     }
   }
 
+  function updateToolbarFont() {
+    const label = document.getElementById('toolbar-font-name');
+    if (label) label.textContent = { modern: 'Liberation Sans', editorial: 'Carlito', serif: 'Liberation Serif' }[styleConfig.fontPairing || 'editorial'];
+  }
+
   async function processHeadshot(file) {
     if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
       throw new Error('Choose a PNG, JPEG, or WebP image');
@@ -1173,6 +1179,7 @@
 
   selectFontPairing?.addEventListener('change', (e) => {
     styleConfig.fontPairing = e.target.value;
+    updateToolbarFont();
     scheduleDebouncedPreview();
   });
 
