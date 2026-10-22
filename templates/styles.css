@@ -1,6 +1,6 @@
 @page {
   size: A4 portrait;
-  margin: 0;
+  margin: 12mm 14mm;
 }
 
 *, *::before, *::after {
@@ -139,7 +139,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   text-transform: uppercase;
   letter-spacing: 0.5pt;
   color: var(--primary-accent);
-  border-bottom: 0.75pt solid #e2e8f0;
+  border-bottom: 1pt solid #b8c2cc;
   padding-bottom: 1.5pt;
   margin-bottom: 4pt;
 }
@@ -329,8 +329,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .readable-layout .project-desc,
 .readable-layout .reference-item,
 .readable-layout .references-request { font-size: var(--font-base-size); line-height: var(--line-height-base); }
-.readable-layout .section-heading { break-after: avoid; }
-.readable-layout .item-header { break-after: avoid; }
+.section-heading, .item-header, .project-heading { break-after: avoid; }
+.experience-item, .project-item, .education-item, .skill-category-row,
+.reference-item, .highlight-list li { break-inside: avoid; }
+.experience-item.allow-page-split, .project-item.allow-page-split,
+.highlight-list li.allow-page-split { break-inside: auto; }
+.summary-text, .highlight-list li, .project-desc, .certs-inline { orphans: 2; widows: 2; }
 .readable-layout .item-header,
 .readable-layout .education-item { flex-wrap: wrap; gap: 2pt 8pt; }
 .readable-layout .item-title-group,
@@ -340,11 +344,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .readable-layout .skill-cat-items { min-width: 0; overflow-wrap: anywhere; }
 
 @media print {
-  html.readable-layout {
+  html {
     width: calc(210mm - 2 * var(--page-padding-x));
     min-height: 0;
     overflow: visible;
   }
-  .readable-layout body { width: 100%; min-height: 0; overflow: visible; }
-  .readable-layout .resume-page { padding: 0; }
+  body { width: 100%; min-height: 0; overflow: visible; }
+  .resume-page { padding: 0; }
 }

@@ -1,4 +1,5 @@
 // Office 2000 Retro Desktop Controller & Interactive Resume Studio
+import { PdfPreview } from './pdf-preview.js';
 (() => {
   const STORAGE_KEY = 'resume_gen_draft_v1';
   const ASSISTANT_KEY = 'resume_gen_office_assistant_enabled';
@@ -59,13 +60,15 @@
   const dismissedAssistantStates = new Set();
 
   // DOM Elements - Shell & Diagnostics
-  const previewFrame = document.getElementById('preview-frame');
+  const previewPages = document.getElementById('preview-pages');
+  const pdfPreview = new PdfPreview(previewPages);
   const placeholderOverlay = document.getElementById('placeholder-overlay');
   const diagnosticsLog = document.getElementById('diagnostics-log');
   const statusBarText = document.getElementById('status-bar-text');
   const statusPageCount = document.getElementById('status-page-count');
   const statusAtsBadge = document.getElementById('status-ats-badge');
   const a4Page = document.getElementById('a4-page');
+  const previewSpacer = document.getElementById('preview-spacer');
   const zoomSelect = document.getElementById('zoom-select');
   const canvasArea = document.getElementById('canvas-area');
   const budgetGuard = document.querySelector('.budget-guard');
@@ -228,6 +231,7 @@
   function invalidatePreview() {
     previewRevision += 1;
     previewController?.abort();
+    pdfPreview.cancelPending();
     setBudgetUnavailable('Budget unavailable — preview is out of date');
   }
 
@@ -268,7 +272,7 @@
 
   function setZoom(scale, isPreset = false) {
     currentZoom = Math.min(Math.max(scale, 0.25), 2.5);
-    if (a4Page) a4Page.style.transform = `scale(${currentZoom.toFixed(2)})`;
+    resizePreviewStack();
 
     const percentText = `${Math.round(currentZoom * 100)}%`;
     let matchingOption = Array.from(zoomSelect.options).find(
@@ -293,14 +297,24 @@
   function applyZoom() {
     const val = zoomSelect.value;
     if (val === 'fit') {
-      const availableHeight = canvasArea.clientHeight - 60;
-      const scale = Math.min(Math.max(availableHeight / 1123, 0.35), 1.0);
-      currentZoom = scale;
-      if (a4Page) a4Page.style.transform = `scale(${scale.toFixed(2)})`;
+      const first = previewPages.querySelector('.pdf-page');
+      const width = first?.offsetWidth || 794;
+      const height = first?.offsetHeight || 1147;
+      currentZoom = Math.min(Math.max(Math.min((canvasArea.clientHeight - 48) / height,
+        (canvasArea.clientWidth - 48) / width), 0.25), 1);
+      resizePreviewStack();
     } else {
       setZoom(parseFloat(val), true);
     }
   }
+
+  function resizePreviewStack() {
+    if (!a4Page || !previewSpacer) return;
+    a4Page.style.transform = `scale(${currentZoom})`;
+    previewSpacer.style.width = `${a4Page.offsetWidth * currentZoom}px`;
+    previewSpacer.style.height = `${a4Page.offsetHeight * currentZoom}px`;
+  }
+  window.addEventListener('pagehide', () => pdfPreview.destroy());
 
   function handleWheelZoom(e) {
     if (e.ctrlKey || e.metaKey) {
@@ -1523,18 +1537,15 @@
         || !Number.isInteger(result.budget.pageCount) || result.budget.pageCount < 1) {
         throw new Error('Preview response is missing valid layout measurements');
       }
-      if (previewFrame) {
-        previewFrame.onload = () => {
-          if (revision !== previewRevision) return;
-          updateBudgetIndicator(result.budget);
-        };
-        previewFrame.srcdoc = result.html;
-      } else {
-        updateBudgetIndicator(result.budget);
-      }
+      clearTimeout(timeout);
+      await pdfPreview.render(result.pdfBase64, result.budget.pageCount, controller.signal);
+      if (revision !== previewRevision) return;
       if (placeholderOverlay) placeholderOverlay.style.display = 'none';
+      resizePreviewStack();
+      if (zoomSelect.value === 'fit') applyZoom();
+      updateBudgetIndicator(result.budget);
 
-      log('Sandboxed preview successfully updated.', 'info');
+      log('PDF preview successfully updated.', 'info');
     } catch (err) {
       if (revision !== previewRevision) return;
       setBudgetUnavailable('Budget unavailable — previous preview is out of date');
@@ -1792,7 +1803,7 @@
           ? `Overflow — generated PDF has ${budget.pageCount} pages`
           : state === 'near' ? `Near the ${pageTarget}-page target` : 'Comfortable fit';
       }
-      setStatus('Document rendered in sandbox', `Page ${budget.pageCount}/${budget.pageCount}`);
+      setStatus('Document preview ready', `Page ${budget.pageCount}/${budget.pageCount}`);
       if (state !== currentBudgetState) {
         currentBudgetState = state;
         const enabled = chkOfficeAssistant?.checked !== false;

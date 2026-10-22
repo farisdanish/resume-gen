@@ -835,33 +835,65 @@ html, body {
 .document-canvas {
   flex: 1;
   overflow: auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  display: block;
   padding: 24px;
   background-color: #585b5d;
 }
 
-.a4-container {
-  width: var(--a4-width);
-  height: var(--a4-height);
-  background-color: #ffffff;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.8);
+.preview-spacer {
   position: relative;
-  transform-origin: top center;
-  transition: transform 0.15s ease-out;
-  overflow: hidden;
-  border: 1px solid #777;
+  margin: 0 auto;
 }
 
-.a4-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background-color: #ffffff;
+.pdf-stack {
+  width: var(--a4-width);
+  min-height: var(--a4-height);
+  position: relative;
+  transform-origin: top left;
+}
+
+.pdf-page-list { width: var(--a4-width); }
+.pdf-pending { position: fixed; left: -100000px; top: 0; visibility: hidden; }
+.pdf-page + .pdf-page { margin-top: 24px; }
+.pdf-page-label { height: 24px; line-height: 20px; color: white; font-size: 12px; text-align: center; }
+.pdf-sheet {
+  position: relative;
+  background: white;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%), 0 0 1px rgb(0 0 0 / 80%);
+}
+.pdf-sheet canvas { display: block; }
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-align: initial;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+/* TextLayer geometry follows PDF.js: https://github.com/mozilla/pdf.js/blob/master/web/text_layer_builder.css */
+.pdf-text-layer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  user-select: text;
+  transform-origin: 0 0;
+}
+.pdf-text-layer > :not(.markedContent), .pdf-text-layer .markedContent span:not(.markedContent) {
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(var(--min-font-size-inv));
+}
+.pdf-text-layer .markedContent { display: contents; }
+.pdf-text-layer ::selection { background: rgb(0 80 180 / 30%); color: transparent; }
+.pdf-text-layer br::selection { background: transparent; }
+#preview-pages {
   display: block;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 /* Watermark / Empty Preview Placeholder */

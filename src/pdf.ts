@@ -49,9 +49,8 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
         const paddingBottom = parseFloat(style.paddingBottom) || 0;
         const contentHeight = Math.max(0, container.getBoundingClientRect().height - paddingTop - paddingBottom);
         let printMargins = 0;
-        if (document.documentElement.classList.contains('readable-layout')) {
-          // The readable template repeats @page margins on every printed page.
-          // Resolve the matching CSS rule's physical units through the layout engine.
+        {
+          // Resolve repeated @page margins in physical units through the layout engine.
           const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules));
           const pageRule = rules.filter((rule): rule is CSSPageRule => rule instanceof CSSPageRule).at(-1);
           const measure = document.createElement('div');
@@ -64,6 +63,11 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
           measure.remove();
         }
         const usableHeight = 297 * 96 / 25.4 - paddingTop - paddingBottom - printMargins;
+        // Avoid moving an entry taller than a page onto an otherwise empty next page.
+        // Short entries remain intact; oversized entries may use the remaining space.
+        for (const item of document.querySelectorAll('.experience-item, .project-item, .highlight-list li')) {
+          item.classList.toggle('allow-page-split', item.getBoundingClientRect().height > usableHeight);
+        }
         return { contentHeight, usableHeight, fullnessPercent: contentHeight / usableHeight * 100 };
       });
 

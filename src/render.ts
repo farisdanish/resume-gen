@@ -152,6 +152,7 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
         --scale-projects: ${styleConfig.sectionScale?.projects ?? 1};
         --scale-references: ${styleConfig.sectionScale?.references ?? 1};
       }
+      @page { margin: ${paddingY} ${paddingX}; }
     `;
     if (styleConfig.bodyFontSize !== undefined) {
       const size = styleConfig.bodyFontSize;
@@ -173,7 +174,6 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
             --font-heading-size: ${Math.max(12, 13 * scale)}pt;
           }`;
         }).join('\n')}
-        @page { margin: ${paddingY} ${paddingX}; }
       `;
     }
   }

@@ -231,7 +231,7 @@
               <div id="diagnostics-log" class="well-panel" style="flex: 1; min-height: 100px; max-height: 140px;">
                 <div class="log-item log-info">[System] Office 2000 environment initialized.</div>
                 <div class="log-item log-info">[Loopback] Connected to 127.0.0.1:3000.</div>
-                <div class="log-item log-info">[Sandbox] Isolated iframe ready.</div>
+                <div class="log-item log-info">[Preview] PDF page renderer ready.</div>
               </div>
             </fieldset>
           </div>
@@ -525,16 +525,17 @@
 
       <!-- Document Canvas -->
       <main class="document-canvas" id="canvas-area">
-        <div class="a4-container" id="a4-page">
-          <!-- Standalone sandboxed iframe without script permissions -->
-          <iframe id="preview-frame" sandbox="" class="a4-iframe" scrolling="no" title="A4 Resume Sandboxed Live Preview"></iframe>
+        <div class="preview-spacer" id="preview-spacer">
+        <div class="pdf-stack" id="a4-page">
+          <div id="preview-pages" aria-label="Resume PDF preview"></div>
           <div id="placeholder-overlay" class="preview-placeholder">
             <div class="placeholder-icon">📄</div>
             <div style="font-size: 13px; font-weight: bold; color: #444;">No Document Rendered</div>
             <div style="font-size: 11px; max-width: 240px; text-align: center;">
-              Click <b>"Extract Resume DOM"</b> to fetch and parse candidate data into the sandboxed A4 template.
+              Click <b>"Extract Resume DOM"</b> to load candidate data and preview the A4 PDF pages.
             </div>
           </div>
+        </div>
         </div>
       </main>
     </div>
@@ -564,7 +565,7 @@
         <dt>3. Choose a Design</dt>
         <dd>Adjust fonts, accent color, density, margins, alignment, and section sizes. Choose date display (ISO or month name) and a one- or two-page target. In Sections, rename headings or change their order.</dd>
         <dt>4. Watch the page budget</dt>
-        <dd>Changes refresh the preview automatically. The budget measures fullness against your selected page target and checks the actual PDF page count. Apply the readable preset in Design for 11 pt body text; choose 10–12 pt explicitly or keep existing density sizing. Density changes spacing with an explicit size. If it overflows, shorten text, hide an optional item such as references, or choose a two-page target. The preset keeps content and the page target unchanged. The preview displays the first page; export the PDF to inspect all pages. Readable exports repeat margins on continuation pages. PDF extraction checks do not certify employer ATS acceptance or tagged-PDF accessibility.</dd>
+        <dd>Changes refresh the preview automatically. Scroll through every PDF page, select text, or use Zoom and Fit Page. The budget checks the actual PDF page count against your selected target. Apply the readable preset in Design for 11 pt body text, or choose 10–12 pt explicitly. If it overflows, shorten text, hide an optional item such as references, or choose a two-page target. Entries continue across pages with repeated margins; short entries stay together where space permits. The preset keeps content and the page target unchanged. PDF extraction checks do not certify employer ATS acceptance or tagged-PDF accessibility.</dd>
         <dt>5. Save Profile for later</dt>
         <dd>Save Profile downloads your content and settings as JSON. Load Profile restores it. Your browser also saves your draft locally. Saved Profiles stores your own named content variants in this browser. Save Current creates a snapshot; Update Saved Profile explicitly replaces it. Loading another profile asks before replacing unsaved edits.</dd>
         <dt>6. Export your PDF</dt>
@@ -589,6 +590,6 @@
     <div class="help-dialog-actions"><button type="button" class="win-button" data-close-help autofocus>OK</button></div>
   </dialog>
 
-  <script src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

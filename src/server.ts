@@ -18,6 +18,7 @@ import { generatePdf } from './pdf';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.resolve(__dirname, '../ui');
+const PDFJS_PATH = fileURLToPath(import.meta.resolve('unpdf/pdfjs'));
 
 export const app = new Hono();
 
@@ -108,10 +109,11 @@ app.post('/api/preview', async (c) => {
     const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
     const html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
-    const { layout, pageCount, isSinglePage } = await generatePdf({ html });
+    const { buffer, layout, pageCount, isSinglePage } = await generatePdf({ html });
     return c.json({
       success: true,
       html,
+      pdfBase64: buffer.toString('base64'),
       budget: { fullnessPercent: layout.fullnessPercent, pageCount, isSinglePage, pageTarget, withinTarget: pageCount <= pageTarget, targetFullnessPercent: layout.fullnessPercent / pageTarget },
     });
   } catch (err: any) {
@@ -184,6 +186,12 @@ app.post('/api/generate-pdf', async (c) => {
     return c.json({ success: false, error: err.message }, 500);
   }
 });
+
+// Expose only the installed renderer bundle, never the dependency directory.
+app.get('/vendor/pdfjs.mjs', (c) => c.body(fs.readFileSync(PDFJS_PATH, 'utf8'), 200, {
+  'Content-Type': 'text/javascript; charset=utf-8',
+  'Cache-Control': 'no-cache',
+}));
 
 // Serve static UI assets
 const relativeUiRoot = path.relative(process.cwd(), UI_DIR) || './ui';

@@ -13,6 +13,84 @@ describe('Design application and measured budget', () => {
   beforeAll(async () => { browser = await chromium.launch({ headless: true }); });
   afterAll(async () => { await browser?.close(); });
 
+  // Catches a short entry splitting between its heading and final content.
+  it.each(['projects', 'experience'] as const)('section-continuation keeps a short %s entry intact at a page boundary', async (section) => {
+    const data = structuredClone(compatibility);
+    data.projects = [{ title: 'SHORT PROJECT', description: 'A short project delivers useful production results. '.repeat(3) + ' SHORT-PROJECT-END', stack: ['TypeScript'], link: 'https://example.com/short' }];
+    data.work = [{ ...data.work[0], company: 'SHORT EMPLOYER', highlights: ['First evidence of production work.', 'Second evidence of useful delivery.', 'SHORT-WORK-END'] }];
+    let html = renderResume(data, { sectionOrder: [section], styleConfig: { bodyFontSize: 11 } });
+    html = html.replace(`<section class="section section-${section}">`, `<div style="height:220mm"></div><section class="section section-${section}">`);
+    const { buffer } = await generatePdf({ html });
+    const result = await inspectPdf(buffer);
+    const title = section === 'projects' ? 'SHORT PROJECT' : 'SHORT EMPLOYER';
+    const end = section === 'projects' ? 'SHORT-PROJECT-END' : 'SHORT-WORK-END';
+    const pages = result.textPages.map((page) => page.runs.map((run) => run.text).join(' '));
+    const index = pages.findIndex((text) => text.includes(title));
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(pages[index]).toContain(end);
+    expect(pages[index]).toContain(section === 'projects' ? 'PROJECTS' : 'WORK EXPERIENCE');
+    for (const raw of Object.values(result.texts)) expect(raw.split(end).length - 1).toBe(1);
+  }, 30000);
+
+  // Catches legacy-sized continuation pages losing top/bottom margins.
+  it.each([undefined, 11] as const)('section-continuation repeats print margins at body size %s', async (bodyFontSize) => {
+    const data = { ...compatibility, work: Array.from({ length: 30 }, () => compatibility.work[0]) };
+    const { buffer } = await generatePdf({ html: renderResume(data, { styleConfig: { bodyFontSize } }) });
+    const result = await inspectPdf(buffer);
+    expect(result.pages.length).toBeGreaterThan(1);
+    for (const page of result.textPages) for (const run of page.runs) {
+      expect(run.y).toBeGreaterThanOrEqual(12 * 72 / 25.4 - 2);
+      expect(run.y + run.height).toBeLessThanOrEqual(page.height - 12 * 72 / 25.4 + 2);
+    }
+  }, 30000);
+
+  it('section-continuation splits oversized work and projects without losing or duplicating sentinels', async () => {
+    const data = structuredClone(compatibility);
+    data.work = [{ ...data.work[0], highlights: Array.from({ length: 75 }, (_, i) => `WorkSentinel${i}: delivered reliable production processing with CPU-intensive queue-driven work.`) }];
+    data.projects[0].description = Array.from({ length: 100 }, (_, i) => `ProjectSentinel${i}: delivered useful production processing and remote collaboration.`).join(' ');
+    const { buffer, pageCount } = await generatePdf({ html: renderResume(data, { styleConfig: { bodyFontSize: 11 } }) });
+    expect(pageCount).toBeGreaterThan(2);
+    const result = await inspectPdf(buffer);
+    expect(result.textPages[0].runs.map((run) => run.text).join(' ')).toContain('WorkSentinel0:');
+    for (const raw of Object.values(result.texts)) {
+      let previous = -1;
+      for (const [prefix, count] of [['WorkSentinel', 75], ['ProjectSentinel', 100]] as const) for (let index = 0; index < count; index++) {
+        const token = `${prefix}${index}:`;
+        expect(raw.split(token).length - 1).toBe(1);
+        const position = raw.indexOf(token);
+        expect(position).toBeGreaterThan(previous);
+        previous = position;
+      }
+      expect(raw).not.toMatch(/[\uE000-\uF8FF\uFFFD]/);
+    }
+  }, 30000);
+
+  it('section-continuation starts an oversized individual bullet below its job header', async () => {
+    const data = structuredClone(compatibility);
+    data.work = [{ ...data.work[0], highlights: ['BULLET-FIRST ' + 'Delivered useful production processing and reliable remote collaboration. '.repeat(160) + ' BULLET-LAST'] }];
+    const { buffer, pageCount } = await generatePdf({ html: renderResume(data, { styleConfig: { bodyFontSize: 11 } }) });
+    expect(pageCount).toBeGreaterThan(1);
+    const result = await inspectPdf(buffer);
+    expect(result.textPages[0].runs.map((run) => run.text).join(' ')).toContain('BULLET-FIRST');
+    for (const raw of Object.values(result.texts)) {
+      expect(raw.split('BULLET-FIRST').length - 1).toBe(1);
+      expect(raw.split('BULLET-LAST').length - 1).toBe(1);
+    }
+  }, 30000);
+
+  it('section rules are visible without overpowering headings', async () => {
+    const page = await browser.newPage({ deviceScaleFactor: 3 });
+    try {
+      await page.setContent(renderResume(compatibility));
+      const rule = await page.locator('.section-heading').first().evaluate((el) => {
+        const style = getComputedStyle(el);
+        return { width: parseFloat(style.borderBottomWidth), color: style.borderBottomColor };
+      });
+      expect(rule.width).toBeGreaterThanOrEqual(1);
+      expect(rule.color).toBe('rgb(184, 194, 204)');
+    } finally { await page.close(); }
+  });
+
   // Catches a font choice rendering as a mixture or silently exporting a different family.
   it.each([
     ['modern', 'ResumeSans', 'LiberationSans'],

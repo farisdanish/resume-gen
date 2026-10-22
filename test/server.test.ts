@@ -31,6 +31,23 @@ describe('Server & Loopback Security Test', () => {
     }
   });
 
+  test('preview-pdf-parity returns the measured PDF bytes and a fixed local renderer asset', async () => {
+    const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: compatibility, styleConfig: { bodyFontSize: 11 } }) });
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(typeof result.pdfBase64).toBe('string');
+    const bytes = Buffer.from(result.pdfBase64, 'base64');
+    expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(result.budget.pageCount);
+    expect(result.html).toContain('Alex Morgan');
+    const asset = await fetch(`${BASE_URL}/vendor/pdfjs.mjs`);
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get('content-type')).toContain('javascript');
+    expect((await asset.text()).includes('getDocument')).toBe(true);
+    expect((await fetch(`${BASE_URL}/vendor/package.json`)).status).toBe(404);
+  }, 30000);
+
   // Catches API silently discarding or accepting an invalid readable font size.
   test.each([9, 13, '11', 'large'])('typography-input-validation rejects API size %j', async (bodyFontSize) => {
     for (const endpoint of ['preview', 'generate-pdf']) {
@@ -255,13 +272,15 @@ describe('Server & Loopback Security Test', () => {
     expect(buffer.byteLength).toBeGreaterThan(1000);
   }, 20000);
 
-  test('GET /: Serves Office 2000 retro web UI with sandboxed iframe', async () => {
+  test('GET /: Serves Office 2000 retro web UI with a PDF page stack', async () => {
     const res = await fetch(`${BASE_URL}/`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('Microsoft Resume 2000');
-    // Enforce sandboxed iframe invariant
-    expect(html).toContain('<iframe id="preview-frame" sandbox=""');
+    // Resume HTML no longer runs inside the UI: the preview accepts PDF bytes only.
+    expect(html).toContain('id="preview-pages"');
+    expect(html).not.toContain('<iframe');
+    expect(html).toContain('type="module" src="/app.js"');
     expect(html).toContain('id="select-body-alignment"');
     expect(html).toContain('id="section-scale-controls"');
     expect(html).toContain('id="select-references-mode"');
@@ -276,8 +295,10 @@ describe('Server & Loopback Security Test', () => {
 
     const jsRes = await fetch(`${BASE_URL}/app.js`);
     expect(jsRes.status).toBe(200);
-    const jsText = await jsRes.text();
-    expect(jsText).toContain('previewFrame');
+    expect(jsRes.headers.get('content-type')).toContain('javascript');
+    const renderer = await fetch(`${BASE_URL}/pdf-preview.js`);
+    expect(renderer.status).toBe(200);
+    expect(renderer.headers.get('content-type')).toContain('javascript');
   });
 
 });

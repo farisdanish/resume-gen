@@ -2,10 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { startServer } from '../src/server';
 import type { Server } from 'node:http';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 import { extractText } from 'unpdf';
 import resumeFixture from '../fixtures/resume.json';
 import { inspectPdf } from './helpers/pdf-checks';
+import compatibility from '../fixtures/pdf-compatibility.json';
 
 describe('Editor preview and budget flow', () => {
   let server: Server;
@@ -22,9 +23,13 @@ describe('Editor preview and budget flow', () => {
     await new Promise<void>((resolve, reject) => server?.close((err) => err ? reject(err) : resolve()));
   });
 
+  async function previewText(page: Page) {
+    return (await page.locator('#preview-pages .pdf-text-layer span').allTextContents()).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
   async function openEditor(page: Page) {
     await page.goto(baseUrl);
-    await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+    await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
   }
 
   async function openProjectEditor(page: Page) {
@@ -37,19 +42,72 @@ describe('Editor preview and budget flow', () => {
       ] })),
     });
     await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Imported legacy resume JSON'));
-    await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+    await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
     await page.locator('[data-tab="tab-content"]').click();
     expect(await page.locator('.input-project-description').count()).toBe(2);
   }
 
   async function downloadedBytes(page: Page, button: string) {
-    const downloading = page.waitForEvent('download');
-    await page.locator(button).click();
-    const stream = await (await downloading).createReadStream();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator(button).click()]);
+    const stream = await download.createReadStream();
     const chunks: Buffer[] = [];
     for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
     return Buffer.concat(chunks);
   }
+
+  // Catches a clipped first-page-only preview and zoom layouts that hide the last page.
+  it.each([[2, 1], [12, 2], [32, 3]])('multipage-preview-reachability shows %i work entries on %i pages', async (count, expectedPages) => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      expect(await page.locator('.pdf-page').count()).toBeGreaterThan(0);
+      const profile = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
+      Object.assign(profile, { draftResume: { ...compatibility, work: Array.from({ length: count }, (_, i) => ({ ...compatibility.work[0], company: `Employer ${i + 1}` })) }, styleConfig: { bodyFontSize: 11 }, pageTarget: 2 });
+      await page.locator('#input-import-json').setInputFiles({ name: 'pages.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(profile)) });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Restored complete tailored profile'));
+      await page.waitForFunction(() => document.querySelectorAll('.pdf-page').length > 0 && document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await page.locator('.pdf-page').count()).toBe(expectedPages);
+      expect(await page.locator('.pdf-text-layer').allTextContents().then((texts) => texts.join(' '))).toContain('Project sentinel: reliable production processing.');
+      expect(await page.locator('.pdf-page canvas').count()).toBe(expectedPages);
+      for (const zoom of ['0.5', '1.0', '1.5', 'fit']) {
+        await page.locator('#zoom-select').selectOption(zoom);
+        await page.locator('#canvas-area').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+        const bounds = await page.locator('.pdf-page').last().boundingBox();
+        const canvas = await page.locator('#canvas-area').boundingBox();
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(canvas!.y + canvas!.height + 2);
+        const lastText = page.locator('.pdf-text-layer span').filter({ hasText: 'Project sentinel:' }).last();
+        await lastText.scrollIntoViewIfNeeded();
+        const textBounds = await lastText.boundingBox();
+        expect(textBounds!.y).toBeGreaterThanOrEqual(canvas!.y - 2);
+        expect(textBounds!.y + textBounds!.height).toBeLessThanOrEqual(canvas!.y + canvas!.height + 2);
+      }
+      const previewCount = await page.locator('.pdf-page').count();
+      const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(pdf.pages.length).toBe(previewCount);
+      for (let index = 0; index < pdf.textPages.length; index++) {
+        const shown = await page.locator('.pdf-text-layer').nth(index).textContent();
+        for (const run of pdf.textPages[index].runs) expect(shown).toContain(run.text);
+      }
+    } finally { await page.close(); }
+  }, 60000);
+
+  it('preview-revision-and-failure retains the previous complete PDF on invalid renderer data', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const before = await page.locator('#preview-pages').textContent();
+      expect(await page.locator('.pdf-page').count()).toBeGreaterThan(0);
+      await page.route('**/api/preview', async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), pdfBase64: 'not-a-pdf' } });
+      });
+      await page.locator('#btn-render-preview').click();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Preview failed');
+      expect(await page.locator('#preview-pages').textContent()).toBe(before);
+      expect(await page.locator('#budget-percent').textContent()).toBe('—');
+      expect(await page.locator('#budget-state').textContent()).toContain('unavailable');
+    } finally { await page.close(); }
+  }, 30000);
 
   // Catches misleading font labels and losing a selected family in saved profiles.
   it('traditional font selector names substitutes and persists the three choices', async () => {
@@ -60,15 +118,21 @@ describe('Editor preview and budget flow', () => {
         'Arial-style (Liberation Sans)', 'Calibri-style (Carlito)', 'Times New Roman-style (Liberation Serif)',
       ]);
       await page.locator('[data-tab="tab-design"]').click();
-      for (const [value, family] of [['modern', 'ResumeSans'], ['editorial', 'ResumeCalibri'], ['serif', 'ResumeSerif']]) {
+      for (const [value, family] of [['modern', 'LiberationSans'], ['editorial', 'Carlito'], ['serif', 'LiberationSerif']]) {
         const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
         await page.locator('#select-font-pairing').selectOption(value);
-        await response;
-        await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
-        expect(await page.frameLocator('#preview-frame').locator('.summary-text').evaluate((el) => getComputedStyle(el).fontFamily)).toContain(family);
+        const result = await (await response).json();
+        await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+        const pdf = await PDFDocument.load(Buffer.from(result.pdfBase64, 'base64'));
+        const names = pdf.getPages().flatMap((sheet) => {
+          const fonts = sheet.node.Resources()?.lookupMaybe(PDFName.of('Font'), PDFDict);
+          return (fonts?.entries() || []).map(([, ref]) => pdf.context.lookup(ref, PDFDict).lookup(PDFName.of('BaseFont'), PDFName).decodeText());
+        });
+        expect(names.length).toBeGreaterThan(0);
+        expect(names.every((name) => name.includes(family))).toBe(true);
       }
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#select-font-pairing').inputValue()).toBe('serif');
       const portable = await downloadedBytes(page, '#btn-export-json');
       expect(JSON.parse(portable.toString()).styleConfig.fontPairing).toBe('serif');
@@ -100,7 +164,7 @@ describe('Editor preview and budget flow', () => {
       const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await page.locator('#btn-readable-preset').click();
       await response;
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#assistant-tip').textContent()).toContain('Shorten a bullet');
       expect(await page.locator('#assistant-tip').textContent()).not.toContain('Switch to Compact');
     } finally { await page.close(); }
@@ -117,8 +181,8 @@ describe('Editor preview and budget flow', () => {
       await page.locator('[data-tab="tab-design"]').click();
       const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await page.locator('#btn-readable-preset').click();
-      await response;
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      const result = await (await response).json();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
       expect(await page.locator('#select-density').textContent()).not.toContain('8.5pt');
       const readable = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
@@ -126,9 +190,10 @@ describe('Editor preview and budget flow', () => {
       expect(readable.visibility).toEqual(legacy.visibility);
       expect(readable.pageTarget).toBe(legacy.pageTarget);
       expect(readable.styleConfig).toMatchObject({ bodyFontSize: 11, bodyAlignment: 'left', fontPairing: 'modern', sectionScale: {}, accentColor: '#1a202c' });
-      expect(await page.frameLocator('#preview-frame').locator('.highlight-list li').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize) * 72 / 96)).toBeCloseTo(11, 1);
+      const rendered = await inspectPdf(Buffer.from(result.pdfBase64, 'base64'));
+      expect(rendered.textPages.flatMap((sheet) => sheet.runs).find((run) => run.text.includes('Architected scalable'))?.height).toBeCloseTo(11, 1);
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#select-body-font-size').inputValue()).toBe('11');
       const portable = await downloadedBytes(page, '#btn-export-json');
       await page.locator('#profile-name').fill('Readable');
@@ -220,7 +285,7 @@ describe('Editor preview and budget flow', () => {
       await page.waitForFunction(() => document.getElementById('profile-library-message')?.textContent === 'Loaded Backend Engineer.');
       expect(await page.locator('#edit-title').inputValue()).not.toBe('Unsaved draft');
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#saved-profile-list option').count()).toBe(3);
       const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
       expect(pdf.texts.unpdf).not.toContain('Unsaved draft');
@@ -270,7 +335,7 @@ describe('Editor preview and budget flow', () => {
       await openEditor(page);
       await page.evaluate(() => localStorage.setItem('resume_gen_profiles_v1', '{broken'));
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#profile-library-message').count()).toBe(1);
       expect(await page.locator('#profile-library-message').textContent()).toContain('unavailable');
       expect(await page.locator('#btn-save-named-profile').isDisabled()).toBe(true);
@@ -288,7 +353,7 @@ describe('Editor preview and budget flow', () => {
       await page.locator('[data-tab="tab-content"]').click();
       await page.locator('#edit-title').fill('Unsaved after reload');
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       const id = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].id);
       await page.locator('#saved-profile-list').selectOption(id);
       page.once('dialog', (dialog) => dialog.dismiss());
@@ -345,10 +410,10 @@ describe('Editor preview and budget flow', () => {
       await page.locator('#select-date-format').selectOption('month-name');
       await page.locator('#select-page-target').selectOption('2');
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('#select-date-format').inputValue()).toBe('month-name');
       expect(await page.locator('#select-page-target').inputValue()).toBe('2');
-      expect(await page.frameLocator('#preview-frame').locator('.item-meta').first().textContent()).toContain('Mar 2024');
+      expect(await previewText(page)).toContain('Mar 2024');
       const profile = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
       expect(profile.pageTarget).toBe(2);
       expect(profile.styleConfig.dateFormat).toBe('month-name');
@@ -386,9 +451,9 @@ describe('Editor preview and budget flow', () => {
       await page.locator('.input-project-link').first().fill('https://example.com/project');
       await response;
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('.input-project-link').first().inputValue()).toBe('https://example.com/project');
-      expect(await page.frameLocator('#preview-frame').locator('.project-item').first().textContent()).toContain('PHP, Laravel, PostgreSQL');
+      expect(await previewText(page)).toContain('PHP, Laravel, PostgreSQL');
       const pdf = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
       expect(pdf.urls).toContain('https://example.com/project');
       expect(pdf.texts.unpdf).toContain('https://example.com/project');
@@ -396,8 +461,11 @@ describe('Editor preview and budget flow', () => {
       const clearing = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await page.locator('.input-project-link').first().fill('');
       await clearing;
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
-      expect(await page.frameLocator('#preview-frame').locator('.project-link').count()).toBe(0);
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await previewText(page)).not.toContain('https://example.com/project');
+      await page.locator('[data-tab="tab-source"]').click();
+      const cleared = await inspectPdf(await downloadedBytes(page, '#btn-download-pdf'));
+      expect(cleared.urls).not.toContain('https://example.com/project');
     } finally { await page.close(); }
   }, 30000);
 
@@ -479,15 +547,15 @@ describe('Editor preview and budget flow', () => {
       const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await page.locator('.input-project-description').first().fill(description);
       const { budget } = await (await response).json();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
-      const frame = page.frameLocator('#preview-frame');
-      expect(await frame.locator('.project-desc').first().textContent()).toBe(description);
-      expect(await frame.locator('.project-desc').nth(1).textContent()).toBe('Keep this description unchanged.');
-      expect(await frame.locator('.project-desc img, .project-desc script').count()).toBe(0);
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      const shown = await previewText(page);
+      expect(shown).toContain(description.trim());
+      expect(shown).toContain('Keep this description unchanged.');
+      expect(await page.locator('#preview-pages img, #preview-pages script').count()).toBe(0);
       expect(Math.round(budget.fullnessPercent)).toBeGreaterThan(oldFill);
       expect(await page.locator('#budget-percent').textContent()).toBe(`${Math.round(budget.fullnessPercent)}%`);
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await page.locator('.input-project-description').first().inputValue()).toBe(description);
       expect(await page.locator('#proj-items-container img, #proj-items-container script').count()).toBe(0);
       await page.locator('[data-tab="tab-source"]').click();
@@ -507,11 +575,12 @@ describe('Editor preview and budget flow', () => {
       const description = 'Edited while excluded, then restored.';
       await page.locator('.input-project-description').first().fill(description);
       await page.reload();
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       await page.locator('[data-tab="tab-content"]').click();
       expect(await page.locator('.input-project-description').first().inputValue()).toBe(description);
       expect(await page.locator('.chk-proj-include').first().isChecked()).toBe(false);
-      expect(await page.frameLocator('#preview-frame').locator('.project-item').count()).toBe(1);
+      expect(await previewText(page)).toContain('Second Project');
+      expect(await previewText(page)).not.toContain(resumeFixture.projects[0].title);
       await page.locator('[data-tab="tab-source"]').click();
       const profile = await downloadedBytes(page, '#btn-export-json');
       expect(JSON.parse(profile.toString()).draftResume.projects[0].description).toBe(description);
@@ -523,8 +592,8 @@ describe('Editor preview and budget flow', () => {
       const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await page.locator('.chk-proj-include').first().check();
       await response;
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
-      expect(await page.frameLocator('#preview-frame').locator('.project-desc').first().textContent()).toBe(description);
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await previewText(page)).toContain(description);
     } finally { await page.close(); }
   }, 30000);
 
@@ -541,10 +610,10 @@ describe('Editor preview and budget flow', () => {
       const response = page.waitForResponse((res) => res.url().endsWith('/api/preview'));
       await input.fill('Corrected description.');
       await response;
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       expect(await input.getAttribute('aria-invalid')).toBe('false');
       expect(await page.locator('#project-description-error-0').isVisible()).toBe(false);
-      expect(await page.frameLocator('#preview-frame').locator('.project-desc').first().textContent()).toBe('Corrected description.');
+      expect(await previewText(page)).toContain('Corrected description.');
     } finally { await page.close(); }
   }, 30000);
 
@@ -557,9 +626,10 @@ describe('Editor preview and budget flow', () => {
       await page.locator('#select-header-alignment').selectOption('center');
       const body = await (await response).json();
       expect(body).toHaveProperty('budget.pageCount', 1);
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
-      const frame = page.frameLocator('#preview-frame');
-      expect(await frame.locator('header').evaluate((el) => getComputedStyle(el).textAlign)).toBe('center');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      const preview = await inspectPdf(Buffer.from(body.pdfBase64, 'base64'));
+      const name = preview.textPages[0].runs.find((run) => run.text === 'ALEX MORGAN')!;
+      expect(Math.abs(name.x + name.width / 2 - preview.pages[0].width / 2)).toBeLessThan(1);
       expect(await page.locator('#budget-percent').textContent()).toBe(`${Math.round(body.budget.fullnessPercent)}%`);
       expect(await page.locator('#status-page-count').textContent()).toBe('Page 1/1');
       await page.locator('[data-tab="tab-source"]').click();
@@ -596,10 +666,11 @@ describe('Editor preview and budget flow', () => {
       await page.locator('#heading-summary').fill('EARLIER SUMMARY');
       await held;
       await page.locator('#heading-summary').fill('LATEST SUMMARY');
-      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document rendered in sandbox');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
       release();
       await page.unrouteAll({ behavior: 'wait' });
-      expect(await page.frameLocator('#preview-frame').locator('.section-summary h2').textContent()).toBe('LATEST SUMMARY');
+      expect(await previewText(page)).toContain('LATEST SUMMARY');
+      expect(await previewText(page)).not.toContain('EARLIER SUMMARY');
     } finally { release?.(); await page.close(); }
   }, 30000);
 

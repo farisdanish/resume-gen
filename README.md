@@ -10,7 +10,7 @@
 - Choose Arial-style (Liberation Sans), Calibri-style (Carlito), or Times New Roman-style (Liberation Serif), with the selected family used throughout the resume.
 - Apply an 11 pt readable preset or select 10, 11 or 12 pt body text.
 - Choose ISO or month-name dates and a one- or two-page target, with overflow warnings based on the exported PDF's page count.
-- Preview changes, download PDFs, and save named profiles locally or import/export profiles as JSON.
+- Preview every PDF page with zoom and selectable text, download PDFs, and save named profiles locally or import/export profiles as JSON.
 - Generate PDFs from the CLI, with optional page-limit and extraction-warning enforcement.
 
 The HTML extractor uses selectors for the supported portfolio layout; other websites may require changes to `src/extract.ts`.
@@ -36,7 +36,9 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
 1. Select **Local Fixture** or **Live Web**, then extract the resume data.
 2. Edit entries in **Content**, adjust appearance in **Design**, and organise headings in **Sections**.
-3. Review the preview and page count, then export the PDF.
+3. Scroll through the PDF pages and review the page count, then export the PDF.
+
+The preview shows the generated PDF's actual page breaks. Short entries stay together where space permits; longer entries continue on the next page with repeated margins.
 
 **Design → Apply readable preset** selects 11 pt body text, left alignment and dark headings. Larger text may require a second page; the preset does not change the page target or remove content. With an explicit text size, density changes spacing and scaled text stays at least 10 pt. **Existing density sizing** uses the original smaller font settings.
 
@@ -112,7 +114,7 @@ Tests require Playwright Chromium and Poppler's `pdftotext` command (`poppler-ut
 
 ## Changelog
 
-Replaced the three font combinations with clearly labelled Arial-style, Calibri-style and Times New Roman-style open-source font choices.
+Added a scrollable multipage PDF preview, improved entry continuation across pages, and strengthened section underlines.
 
 ## License
 
