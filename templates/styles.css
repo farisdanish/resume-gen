@@ -150,7 +150,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   font-size: var(--font-base-size);
   line-height: var(--line-height-base);
   color: #2d3748;
-  text-align: var(--body-align);
+  text-align: justify;
   hyphens: none;
   overflow-wrap: break-word;
 }

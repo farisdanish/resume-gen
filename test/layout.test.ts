@@ -181,6 +181,20 @@ describe('Design application and measured budget', () => {
     }
   }, 30000);
 
+  it('justifies the summary while preserving the hyphen guard and other body alignment', async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(renderResume(compatibility, { styleConfig: { bodyAlignment: 'left', bodyFontSize: 11 } }));
+      const styles = await page.locator('.summary-text').evaluate((el) => ({
+        alignment: getComputedStyle(el).textAlign,
+        hyphens: getComputedStyle(el).hyphens,
+      }));
+      expect(styles.alignment).toBe('justify');
+      expect(styles.hyphens).toBe('none');
+      expect(await page.locator('.highlight-list li').first().evaluate((el) => getComputedStyle(el).textAlign)).toBe('left');
+    } finally { await page.close(); }
+  });
+
   it('applies Design controls to computed styles rather than merely emitting CSS', async () => {
     const page = await browser.newPage();
     try {
@@ -192,7 +206,7 @@ describe('Design application and measured budget', () => {
         accent: getComputedStyle(document.querySelector('.section-heading')!).color,
         font: getComputedStyle(document.querySelector('h1')!).fontFamily,
         header: getComputedStyle(document.querySelector('header')!).textAlign,
-        body: getComputedStyle(document.querySelector('.summary-text')!).textAlign,
+        body: getComputedStyle(document.querySelector('.highlight-list li')!).textAlign,
         padding: getComputedStyle(document.querySelector('.resume-page')!).paddingTop,
         skills: getComputedStyle(document.querySelector('.section-skills')!).zoom,
         experience: getComputedStyle(document.querySelector('.section-experience')!).zoom,
