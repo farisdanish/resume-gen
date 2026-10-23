@@ -61,6 +61,10 @@ export const EducationSchema = z
     specialization: z.string().min(1).optional(),
     grade: z.object({ value: z.number().min(0), scale: z.number().positive(), label: z.string().min(1).optional() })
       .refine((grade) => grade.value <= grade.scale, { message: 'Grade cannot exceed scale', path: ['value'] }).optional(),
+    spmResults: z.object({
+      overall: z.string().trim().min(1).optional(),
+      bahasaMelayu: z.string().trim().min(1).optional(),
+    }).optional(),
     achievements: z.array(z.string().min(1)).default([]),
     academicProject: z.object({ title: z.string().min(1), description: z.string().min(1).optional() }).optional(),
     subjects: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), grade: z.string().min(1).optional() }))

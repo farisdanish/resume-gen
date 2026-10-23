@@ -18,6 +18,17 @@ const OUT_DIR = path.resolve(ROOT_DIR, 'out');
 const SCRATCH_DIR = path.resolve(ROOT_DIR, 'out/test-scratch');
 
 describe('Smoke Test Suite', () => {
+  test('SPM text results remain readable in the PDF', async () => {
+    const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0],
+      level: 'spm', degree: 'Sijil Pelajaran Malaysia (SPM)', grade: undefined,
+      spmResults: { overall: '5A2B1C1D', bahasaMelayu: 'A-' } }] });
+    const result = await generatePdf({ html: renderResume(resume) });
+    expect(result.pageCount).toBe(1);
+    const text = (await extractText(new Uint8Array(result.buffer))).text.join(' ');
+    expect(text).toContain('5A2B1C1D');
+    expect(text).toContain('Bahasa Melayu: A-');
+    expect(text).not.toContain('CGPA:');
+  }, 60000);
   test('education detail remains readable in compact and detailed PDFs', async () => {
     const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }], academicProject: { title: 'Campus Scheduler' } }] });
     const compact = await generatePdf({ html: renderResume(resume, { educationConfig: { mode: 'compact' } }) });

@@ -55,6 +55,46 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('adds an SPM entry with independent overall and Bahasa Melayu results', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#btn-add-spm').click();
+      const spm = page.locator('.education-editor-card').last();
+      expect(await spm.locator('[data-field="degree"]').inputValue()).toBe('Sijil Pelajaran Malaysia (SPM)');
+      expect(await spm.locator('[data-grade]').count()).toBe(0);
+      await spm.locator('[data-field="institution"]').fill('Maktab Rendah Sains MARA Kota Kinabalu');
+      await spm.locator('[data-field="end"]').fill('2017');
+      await spm.locator('[data-spm="overall"]').fill('5A2B1C1D');
+      await spm.locator('[data-spm="bahasaMelayu"]').fill('A-');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      const text = await previewText(page);
+      expect(text).toContain('5A2B1C1D');
+      expect(text).toContain('Bahasa Melayu: A-');
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(draft.draftResume.education.at(-1).spmResults).toEqual({ overall: '5A2B1C1D', bahasaMelayu: 'A-' });
+    } finally { await page.close(); }
+  }, 30000);
+
+  it('lets a migrated SPM copy remove its inherited CGPA', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const copied = { ...resumeFixture.education[0], degree: 'Sijil Pelajaran Malaysia (SPM)', level: 'spm',
+        grade: { value: 3.5, scale: 4 }, spmResults: { overall: '5A2B1C1D' } };
+      await page.locator('#input-import-json').setInputFiles({ name: 'spm-copy.json', mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify({ ...resumeFixture, education: [...resumeFixture.education, copied] })) });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Imported legacy resume JSON'));
+      await page.locator('[data-tab="tab-content"]').click();
+      const spm = page.locator('.education-editor-card').last();
+      await spm.locator('[data-action="clear-grade"]').click();
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(draft.draftResume.education.at(-1).grade).toBeUndefined();
+      expect(draft.draftResume.education.at(-1).spmResults.overall).toBe('5A2B1C1D');
+    } finally { await page.close(); }
+  }, 30000);
+
   it('keeps education visibility with its qualification after reorder and draft save', async () => {
     const page = await browser.newPage({ acceptDownloads: true });
     try {

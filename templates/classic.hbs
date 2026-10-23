@@ -81,6 +81,8 @@
           </div>{{/if}}
         </div>
         {{#if this.grade}}<div class="edu-detail">{{#if this.grade.label}}{{this.grade.label}}{{else}}CGPA{{/if}}: {{this.grade.value}} / {{this.grade.scale}}</div>{{/if}}
+        {{#if this.spmResults.overall}}<div class="edu-detail">SPM Results: {{this.spmResults.overall}}</div>{{/if}}
+        {{#if this.spmResults.bahasaMelayu}}<div class="edu-detail">Bahasa Melayu: {{this.spmResults.bahasaMelayu}}</div>{{/if}}
         {{#each this.achievements}}<div class="edu-detail">• {{this}}</div>{{/each}}
         {{#if this.academicProject}}<div class="edu-detail">Academic Project: {{this.academicProject.title}}{{#if this.academicProject.description}} — {{this.academicProject.description}}{{/if}}</div>{{/if}}
         {{#each this.subjects}}<div class="edu-detail">{{this.name}}{{#if this.grade}}: {{this.grade}}{{/if}}</div>{{/each}}

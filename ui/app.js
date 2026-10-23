@@ -967,10 +967,16 @@ import { PdfPreview } from './pdf-preview.js';
         <div class="editor-card-body">
           <div class="edu-actions"><button type="button" data-action="up">↑ Move Up</button><button type="button" data-action="down">↓ Move Down</button><button type="button" data-action="duplicate">Duplicate</button><button type="button" data-action="remove">Remove</button></div>
           ${['institution','degree','specialization','start','end'].map((field) => `<label>${field}<input class="win-input" data-field="${field}" type="text"></label>`).join('')}
-          <label>Grade label<input class="win-input" data-grade="label" type="text" placeholder="CGPA"></label>
-          <label>Grade value<input class="win-input" data-grade="value" type="number" min="0" step="any"></label>
-          <label>Grade scale<input class="win-input" data-grade="scale" type="number" min="0.01" step="any"></label>
-          <button type="button" data-action="clear-grade">Clear Grade</button>
+          ${edu.level === 'spm' ? `
+            <label>Overall SPM results<input class="win-input" data-spm="overall" type="text" placeholder="e.g. 5A2B1C1D"></label>
+            <label>Bahasa Melayu grade<input class="win-input" data-spm="bahasaMelayu" type="text" placeholder="e.g. A-"></label>
+            ${edu.grade ? '<button type="button" data-action="clear-grade">Remove copied CGPA</button>' : ''}
+          ` : `
+            <label>Grade label<input class="win-input" data-grade="label" type="text" placeholder="CGPA"></label>
+            <label>Grade value<input class="win-input" data-grade="value" type="number" min="0" step="any"></label>
+            <label>Grade scale<input class="win-input" data-grade="scale" type="number" min="0.01" step="any"></label>
+            <button type="button" data-action="clear-grade">Clear Grade</button>
+          `}
           <label>Achievements (one per line)<textarea class="win-textarea" data-list="achievements"></textarea></label>
           <label>Academic project title<input class="win-input" data-project="title" type="text"></label>
           <label>Academic project description<textarea class="win-textarea" data-project="description"></textarea></label>
@@ -980,7 +986,7 @@ import { PdfPreview } from './pdf-preview.js';
       eduItemsContainer.appendChild(card);
       const validationId = `edu-validation-${index}`;
       card.querySelector('.edu-validation').id = validationId;
-      card.querySelectorAll('[data-field], [data-grade], [data-project]').forEach((input) => input.setAttribute('aria-describedby', validationId));
+      card.querySelectorAll('[data-field], [data-grade], [data-spm], [data-project]').forEach((input) => input.setAttribute('aria-describedby', validationId));
       card.querySelector('.edu-include').addEventListener('change', (event) => { visibility.education[edu.id] = event.target.checked; scheduleDebouncedPreview(); });
       card.querySelectorAll('[data-field]').forEach((input) => {
         input.value = edu[input.dataset.field] ?? '';
@@ -1003,6 +1009,16 @@ import { PdfPreview } from './pdf-preview.js';
           if (value || scale) edu.grade = { value: value === '' ? -1 : Number(value), scale: scale === '' ? 0 : Number(scale), ...(label ? { label } : {}) };
           else delete edu.grade;
           showEducationValidation(card, edu);
+          scheduleDebouncedPreview();
+        });
+      });
+      card.querySelectorAll('[data-spm]').forEach((input) => {
+        input.value = edu.spmResults?.[input.dataset.spm] || '';
+        input.addEventListener('input', () => {
+          const overall = card.querySelector('[data-spm="overall"]').value.trim();
+          const bahasaMelayu = card.querySelector('[data-spm="bahasaMelayu"]').value.trim();
+          if (overall || bahasaMelayu) edu.spmResults = { ...(overall ? { overall } : {}), ...(bahasaMelayu ? { bahasaMelayu } : {}) };
+          else delete edu.spmResults;
           scheduleDebouncedPreview();
         });
       });
@@ -1065,11 +1081,14 @@ import { PdfPreview } from './pdf-preview.js';
     const message = card.querySelector('.edu-validation'); message.textContent = issues.join(' '); message.hidden = !issues.length;
   }
 
-  document.getElementById('btn-add-education')?.addEventListener('click', () => {
+  function addEducation(spm = false) {
     if (!draftResume) return;
-    draftResume.education.push({ id: educationId(), institution: '', degree: '', end: null, achievements: [], subjects: [] });
+    draftResume.education.push({ id: educationId(), institution: '', degree: spm ? 'Sijil Pelajaran Malaysia (SPM)' : '',
+      ...(spm ? { level: 'spm' } : {}), end: null, achievements: [], subjects: [] });
     renderEducationEditor(); eduItemsContainer.lastElementChild.querySelector('[data-field="institution"]').focus(); scheduleDebouncedPreview();
-  });
+  }
+  document.getElementById('btn-add-education')?.addEventListener('click', () => addEducation());
+  document.getElementById('btn-add-spm')?.addEventListener('click', () => addEducation(true));
   document.getElementById('education-mode')?.addEventListener('change', (event) => { educationConfig.mode = event.target.value; scheduleDebouncedPreview(); });
   document.querySelectorAll('[data-education-display]').forEach((input) => input.addEventListener('change', () => { educationConfig[input.dataset.educationDisplay] = input.checked; scheduleDebouncedPreview(); }));
   function renderEduAndProjectsEditor() {

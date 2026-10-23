@@ -12,6 +12,12 @@ import { DEFAULT_SECTION_ORDER } from '../src/constants';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Education customization', () => {
+  test('accepts free-text SPM results independently of numeric CGPA', () => {
+    const parsed = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0],
+      level: 'spm', degree: 'Sijil Pelajaran Malaysia (SPM)', spmResults: { overall: '5A2B1C1D', bahasaMelayu: 'A-' } }] });
+    expect(parsed.education[0].spmResults).toEqual({ overall: '5A2B1C1D', bahasaMelayu: 'A-' });
+    expect(parsed.education[0].grade).toBeUndefined();
+  });
   test('normalizes legacy entries without inventing academic claims', () => {
     const parsed = ResumeSchema.parse(resumeFixture);
     expect(parsed.education[0].id).toMatch(/^edu-/);

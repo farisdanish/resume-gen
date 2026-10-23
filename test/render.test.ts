@@ -3,6 +3,19 @@ import { renderResume } from '../src/render';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Template & Render Engine', () => {
+  it('renders SPM text results without a numeric CGPA or invented values', () => {
+    const spm = { ...resumeFixture.education[0], degree: 'Sijil Pelajaran Malaysia (SPM)', level: 'spm',
+      grade: { value: 3.5, scale: 4 }, spmResults: { overall: '5A2B1C1D', bahasaMelayu: 'A-' } };
+    const resume = { ...resumeFixture, education: [spm] };
+    const html = renderResume(resume);
+    expect(html).toContain('SPM Results: 5A2B1C1D');
+    expect(html).toContain('Bahasa Melayu: A-');
+    expect(html).not.toContain('CGPA:');
+    const compact = renderResume(resume, { educationConfig: { mode: 'compact' } });
+    expect(compact).not.toContain('5A2B1C1D');
+    expect(compact).not.toContain('Bahasa Melayu: A-');
+    expect(spm.spmResults.overall).toBe('5A2B1C1D');
+  });
   it('keeps CGPA and SPM subjects independent across display modes', () => {
     const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }] }] };
     const detailed = renderResume(resume, { educationConfig: { mode: 'detailed', showSubjects: true } });
