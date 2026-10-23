@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Resume document</title>
+  <path fill="#0a246a" d="M3 2h22v25H3z"/>
+  <path fill="#404040" d="M7 6h17l5 5v19H7z"/>
+  <path fill="#fff" d="M5 4h17l5 5v19H5z"/>
+  <path fill="#a6caf0" d="M22 4v5h5z"/>
+  <path fill="#0a246a" d="M9 9h9v3H9zm0 7h14v2H9zm0 4h14v2H9zm0 4h10v2H9z"/>
+</svg>

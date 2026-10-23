@@ -31,6 +31,18 @@ describe('Server & Loopback Security Test', () => {
     }
   });
 
+  // Catches the browser tab silently falling back to a generic icon.
+  test('serves the configured resume favicon', async () => {
+    const page = await fetch(BASE_URL);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">');
+
+    const favicon = await fetch(`${BASE_URL}/favicon.svg`);
+    expect(favicon.status).toBe(200);
+    expect(favicon.headers.get('content-type')).toContain('image/svg+xml');
+    expect(await favicon.text()).toContain('<title>Resume document</title>');
+  });
+
   test('preview-pdf-parity returns the measured PDF bytes and a fixed local renderer asset', async () => {
     const response = await fetch(`${BASE_URL}/api/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: compatibility, styleConfig: { bodyFontSize: 11 } }) });
     expect(response.status).toBe(200);
