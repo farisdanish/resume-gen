@@ -44,9 +44,10 @@ export const EducationDisplayConfigSchema = z.object({
   showSpecialization: z.boolean().default(true),
   showAcademicProject: z.boolean().default(false),
   showAchievements: z.boolean().default(true),
+  showActivities: z.boolean().default(true),
   showSubjects: z.boolean().default(false),
   showDates: z.boolean().default(true),
-}).default({ mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showSubjects: false, showDates: true });
+}).default({ mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showActivities: true, showSubjects: false, showDates: true });
 export type EducationDisplayConfig = z.infer<typeof EducationDisplayConfigSchema>;
 
 export const EducationSchema = z
@@ -66,6 +67,7 @@ export const EducationSchema = z
       bahasaMelayu: z.string().trim().min(1).optional(),
     }).optional(),
     achievements: z.array(z.string().min(1)).default([]),
+    activities: z.array(z.string().min(1)).default([]),
     academicProject: z.object({ title: z.string().min(1), description: z.string().min(1).optional() }).optional(),
     subjects: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), grade: z.string().min(1).optional() }))
       .refine((subjects) => new Set(subjects.map((subject) => subject.id)).size === subjects.length, 'Subject IDs must be unique').default([]),

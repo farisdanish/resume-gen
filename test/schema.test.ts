@@ -23,7 +23,15 @@ describe('Education customization', () => {
     expect(parsed.education[0].id).toMatch(/^edu-/);
     expect(parsed.education[0].achievements).toEqual([]);
     expect(parsed.education[0].subjects).toEqual([]);
+    expect(parsed.education[0].activities).toEqual([]);
     expect(ResumeSchema.parse(resumeFixture).education[0].id).toBe(parsed.education[0].id);
+  });
+
+  test('preserves legacy subjects while validating activities', () => {
+    const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0], subjects: [{ name: 'Physics', grade: 'A' }], activities: ['Robotics Club'] }] });
+    expect(resume.education[0].subjects[0].name).toBe('Physics');
+    expect(resume.education[0].activities).toEqual(['Robotics Club']);
+    expect(ResumeSchema.safeParse({ ...resume, education: [{ ...resume.education[0], activities: [''] }] }).success).toBe(false);
   });
 
   test('rejects duplicate IDs and grades above their scale', () => {

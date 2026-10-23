@@ -96,8 +96,9 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
       grade: item.level !== 'spm' && detail !== 'compact' && educationConfig.showGrade ? item.grade : undefined,
       spmResults: item.level === 'spm' && detail !== 'compact' && educationConfig.showGrade ? item.spmResults : undefined,
       achievements: detail !== 'compact' && educationConfig.showAchievements ? item.achievements : [],
+      activities: detail !== 'compact' && educationConfig.showActivities ? item.activities : [],
       academicProject: detail === 'detailed' && educationConfig.showAcademicProject ? item.academicProject : undefined,
-      subjects: detail === 'detailed' && educationConfig.showSubjects ? item.subjects : [],
+      subjects: [], // Retained in profiles for compatibility, not shown on resumes.
     })),
   };
 

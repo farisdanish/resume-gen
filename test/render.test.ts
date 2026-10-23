@@ -16,15 +16,25 @@ describe('Template & Render Engine', () => {
     expect(compact).not.toContain('Bahasa Melayu: A-');
     expect(spm.spmResults.overall).toBe('5A2B1C1D');
   });
-  it('keeps CGPA and SPM subjects independent across display modes', () => {
+  it('keeps legacy subjects stored but omits them from every resume mode', () => {
     const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }] }] };
     const detailed = renderResume(resume, { educationConfig: { mode: 'detailed', showSubjects: true } });
     expect(detailed).toContain('CGPA: 3.8 / 4');
-    expect(detailed).toContain('Bahasa Melayu: A-');
+    expect(detailed).not.toContain('Bahasa Melayu: A-');
     const compact = renderResume(resume, { educationConfig: { mode: 'compact', showSubjects: true } });
     expect(compact).not.toContain('CGPA:');
     expect(compact).not.toContain('Bahasa Melayu');
     expect(resume.education[0].grade.value).toBe(3.8);
+    expect(resume.education[0].subjects[0].grade).toBe('A-');
+  });
+  it('renders activities and limits academic projects to detailed mode', () => {
+    const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], activities: ['Robotics Club', 'Peer mentor'], academicProject: { title: 'Campus Scheduler' } }] };
+    const balanced = renderResume(resume, { educationConfig: { showAcademicProject: true } });
+    expect(balanced).toContain('Activities: Robotics Club; Peer mentor');
+    expect(balanced).not.toContain('Campus Scheduler');
+    const detailed = renderResume(resume, { educationConfig: { mode: 'detailed', showAcademicProject: true } });
+    expect(detailed).toContain('Campus Scheduler');
+    expect(detailed).toContain('Activities: Robotics Club; Peer mentor');
   });
   it('escapes academic details and omits missing values', () => {
     const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], achievements: ['<script>alert(1)</script>'] }] };

@@ -30,13 +30,14 @@ describe('Smoke Test Suite', () => {
     expect(text).not.toContain('CGPA:');
   }, 60000);
   test('education detail remains readable in compact and detailed PDFs', async () => {
-    const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }], academicProject: { title: 'Campus Scheduler' } }] });
+    const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }], activities: ['Robotics Club'], academicProject: { title: 'Campus Scheduler' } }] });
     const compact = await generatePdf({ html: renderResume(resume, { educationConfig: { mode: 'compact' } }) });
     expect(compact.pageCount).toBe(1);
     const detailed = await generatePdf({ html: renderResume(resume, { educationConfig: { mode: 'detailed', showSubjects: true, showAcademicProject: true } }) });
     expect(detailed.pageCount).toBeLessThanOrEqual(2);
     const text = (await extractText(new Uint8Array(detailed.buffer))).text.join(' ');
-    expect(text).toContain('Bahasa Melayu');
+    expect(text).not.toContain('Bahasa Melayu');
+    expect(text).toContain('Robotics Club');
     expect(text).toContain('Campus Scheduler');
     expect(text).toContain('3.8');
   }, 60000);

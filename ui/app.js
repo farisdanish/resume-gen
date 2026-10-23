@@ -4,7 +4,7 @@ import { PdfPreview } from './pdf-preview.js';
   const STORAGE_KEY = 'resume_gen_draft_v1';
   const ASSISTANT_KEY = 'resume_gen_office_assistant_enabled';
   const PROFILE_VERSION = 2;
-  const DEFAULT_EDUCATION_CONFIG = { mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showSubjects: false, showDates: true };
+  const DEFAULT_EDUCATION_CONFIG = { mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showActivities: true, showSubjects: false, showDates: true };
   const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects', 'references'];
   const SECTION_LABELS = {
     summary: 'Summary',
@@ -58,6 +58,7 @@ import { PdfPreview } from './pdf-preview.js';
   let sectionOrder = [...DEFAULT_SECTION_ORDER];
   let pageTarget = 1;
   let educationConfig = { ...DEFAULT_EDUCATION_CONFIG };
+  const openEducationCards = new Set();
   let currentBudgetState = 'waiting';
   const dismissedAssistantStates = new Set();
 
@@ -386,6 +387,7 @@ import { PdfPreview } from './pdf-preview.js';
   }
 
   function applyProfile(profile) {
+    openEducationCards.clear();
     draftResume = profile.draftResume;
     visibility = profile.visibility;
     styleConfig = profile.styleConfig;
@@ -950,6 +952,7 @@ import { PdfPreview } from './pdf-preview.js';
       item.id = id;
       used.add(id);
       item.achievements ||= [];
+      item.activities ||= [];
       item.subjects ||= [];
       item.subjects.forEach((subject, subjectIndex) => { subject.id ||= `${id}-subject-${subjectIndex + 1}`; });
     });
@@ -963,8 +966,9 @@ import { PdfPreview } from './pdf-preview.js';
     (draftResume.education || []).forEach((edu, index) => {
       const card = document.createElement('div');
       card.className = 'editor-card education-editor-card';
-      card.innerHTML = `<div class="editor-card-header"><label class="win-checkbox-row"><input class="edu-include" type="checkbox" ${visibility.education[edu.id] !== false ? 'checked' : ''}><span>${escapeHtml(edu.degree || 'New qualification')} — ${escapeHtml(edu.institution || 'Institution')}</span></label></div>
-        <div class="editor-card-body">
+      const isOpen = openEducationCards.has(edu.id);
+      card.innerHTML = `<div class="editor-card-header"><label class="win-checkbox-row"><input class="edu-include" type="checkbox" ${visibility.education[edu.id] !== false ? 'checked' : ''}><span>${escapeHtml(edu.degree || 'New qualification')} — ${escapeHtml(edu.institution || 'Institution')}</span></label><button type="button" class="win-button win-button-sm edu-toggle" aria-expanded="${isOpen}" aria-controls="edu-body-${index}">${isOpen ? 'Collapse' : 'Edit'}</button></div>
+        <div class="editor-card-body" id="edu-body-${index}" ${isOpen ? '' : 'hidden'}>
           <div class="edu-actions"><button type="button" data-action="up">↑ Move Up</button><button type="button" data-action="down">↓ Move Down</button><button type="button" data-action="duplicate">Duplicate</button><button type="button" data-action="remove">Remove</button></div>
           ${['institution','degree','specialization','start','end'].map((field) => `<label>${field}<input class="win-input" data-field="${field}" type="text"></label>`).join('')}
           ${edu.level === 'spm' ? `
@@ -978,12 +982,21 @@ import { PdfPreview } from './pdf-preview.js';
             <button type="button" data-action="clear-grade">Clear Grade</button>
           `}
           <label>Achievements (one per line)<textarea class="win-textarea" data-list="achievements"></textarea></label>
+          <label>Activities (one per line)<textarea class="win-textarea" data-list="activities"></textarea></label>
           <label>Academic project title<input class="win-input" data-project="title" type="text"></label>
           <label>Academic project description<textarea class="win-textarea" data-project="description"></textarea></label>
-          <label>Subjects (one per line, name: grade)<textarea class="win-textarea" data-list="subjects"></textarea></label>
+          <p class="education-help">Academic projects appear only in Detailed mode.</p>
           <div class="edu-validation" role="alert" hidden></div>
         </div>`;
       eduItemsContainer.appendChild(card);
+      card.querySelector('.edu-toggle').addEventListener('click', (event) => {
+        const expanded = !openEducationCards.has(edu.id);
+        if (expanded) openEducationCards.add(edu.id);
+        else openEducationCards.delete(edu.id);
+        card.querySelector('.editor-card-body').hidden = !expanded;
+        event.currentTarget.setAttribute('aria-expanded', String(expanded));
+        event.currentTarget.textContent = expanded ? 'Collapse' : 'Edit';
+      });
       const validationId = `edu-validation-${index}`;
       card.querySelector('.edu-validation').id = validationId;
       card.querySelectorAll('[data-field], [data-grade], [data-spm], [data-project]').forEach((input) => input.setAttribute('aria-describedby', validationId));
@@ -1025,15 +1038,9 @@ import { PdfPreview } from './pdf-preview.js';
       const achievements = card.querySelector('[data-list="achievements"]');
       achievements.value = (edu.achievements || []).join('\n');
       achievements.addEventListener('input', () => { edu.achievements = achievements.value.split('\n').map((value) => value.trim()).filter(Boolean); scheduleDebouncedPreview(); });
-      const subjects = card.querySelector('[data-list="subjects"]');
-      subjects.value = (edu.subjects || []).map((subject) => `${subject.name}${subject.grade ? `: ${subject.grade}` : ''}`).join('\n');
-      subjects.addEventListener('input', () => {
-        edu.subjects = subjects.value.split('\n').map((line, subjectIndex) => {
-          const [name, ...gradeParts] = line.split(':');
-          return { id: edu.subjects?.[subjectIndex]?.id || `${edu.id}-subject-${crypto.randomUUID()}`, name: name.trim(), ...(gradeParts.join(':').trim() ? { grade: gradeParts.join(':').trim() } : {}) };
-        }).filter((subject) => subject.name);
-        scheduleDebouncedPreview();
-      });
+      const activities = card.querySelector('[data-list="activities"]');
+      activities.value = (edu.activities || []).join('\n');
+      activities.addEventListener('input', () => { edu.activities = activities.value.split('\n').map((value) => value.trim()).filter(Boolean); scheduleDebouncedPreview(); });
       card.querySelectorAll('[data-project]').forEach((input) => {
         input.value = edu.academicProject?.[input.dataset.project] || '';
         input.addEventListener('input', () => {
@@ -1050,11 +1057,12 @@ import { PdfPreview } from './pdf-preview.js';
         if (action === 'remove') {
           if (draftResume.education.length === 1) { alert('At least one qualification is required.'); return; }
           if ((edu.institution || edu.degree || edu.grade || edu.subjects?.length) && !confirm('Remove this qualification?')) return;
-          draftResume.education.splice(index, 1); delete visibility.education[edu.id];
+          draftResume.education.splice(index, 1); delete visibility.education[edu.id]; openEducationCards.delete(edu.id);
         } else if (action === 'duplicate') {
           const copy = structuredClone(edu); copy.id = educationId(); copy.degree = `${copy.degree || ''} (Copy)`;
           copy.subjects = (copy.subjects || []).map((subject) => ({ ...subject, id: `${copy.id}-subject-${crypto.randomUUID()}` }));
           draftResume.education.splice(index + 1, 0, copy); visibility.education[copy.id] = visibility.education[edu.id] !== false;
+          openEducationCards.add(copy.id);
         } else {
           const target = index + (action === 'up' ? -1 : 1);
           if (target < 0 || target >= draftResume.education.length) return;
@@ -1084,7 +1092,8 @@ import { PdfPreview } from './pdf-preview.js';
   function addEducation(spm = false) {
     if (!draftResume) return;
     draftResume.education.push({ id: educationId(), institution: '', degree: spm ? 'Sijil Pelajaran Malaysia (SPM)' : '',
-      ...(spm ? { level: 'spm' } : {}), end: null, achievements: [], subjects: [] });
+      ...(spm ? { level: 'spm' } : {}), end: null, achievements: [], activities: [], subjects: [] });
+    openEducationCards.add(draftResume.education.at(-1).id);
     renderEducationEditor(); eduItemsContainer.lastElementChild.querySelector('[data-field="institution"]').focus(); scheduleDebouncedPreview();
   }
   document.getElementById('btn-add-education')?.addEventListener('click', () => addEducation());
@@ -1763,6 +1772,7 @@ import { PdfPreview } from './pdf-preview.js';
       return;
     }
     if (confirm('Revert all customizations back to pristine extracted data?')) {
+      openEducationCards.clear();
       draftResume = JSON.parse(JSON.stringify(pristineResume));
       visibility = {
         contact: { phone: true, email: true, location: true, github: true, linkedin: true, website: true },

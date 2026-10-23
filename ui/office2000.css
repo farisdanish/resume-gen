@@ -856,9 +856,14 @@ html, body {
 .pdf-pending { position: fixed; left: -100000px; top: 0; visibility: hidden; }
 .education-editor-card { margin: 6px 0; }
 .education-editor-card .editor-card-body { display: flex; flex-direction: column; gap: 5px; }
+.education-editor-card .editor-card-body[hidden] { display: none; }
+.education-editor-card .editor-card-header { gap: 4px; }
+.education-editor-card .editor-card-header .win-checkbox-row { flex: 1; min-width: 0; }
+.education-editor-card .edu-toggle { flex: none; }
 .education-editor-card .editor-card-body label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
 .education-editor-card .edu-actions { display: flex; flex-wrap: wrap; gap: 3px; }
 .education-editor-card .edu-validation { color: #9b1c1c; font-size: 10px; }
+.education-help { color: #555; font-size: 10px; line-height: 1.35; margin: 4px 0; }
 .pdf-page + .pdf-page { margin-top: 24px; }
 .pdf-page-label { height: 24px; line-height: 20px; color: white; font-size: 12px; text-align: center; }
 .pdf-sheet {

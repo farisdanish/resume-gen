@@ -55,6 +55,24 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('collapses education cards and explains detailed-only academic projects', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-content"]').click();
+      const card = page.locator('.education-editor-card').first();
+      expect(await card.locator('.editor-card-body').isVisible()).toBe(false);
+      expect(await card.locator('.edu-toggle').getAttribute('aria-expanded')).toBe('false');
+      expect(await page.locator('#education-display-controls').textContent()).toContain('Academic projects appear only in Detailed mode.');
+      await card.locator('.edu-toggle').click();
+      expect(await card.locator('.editor-card-body').isVisible()).toBe(true);
+      expect(await card.locator('[data-list="activities"]').count()).toBe(1);
+      expect(await card.locator('[data-list="subjects"]').count()).toBe(0);
+      await card.locator('.edu-toggle').click();
+      expect(await card.locator('.editor-card-body').isVisible()).toBe(false);
+    } finally { await page.close(); }
+  }, 30000);
+
   it('adds an SPM entry with independent overall and Bahasa Melayu results', async () => {
     const page = await browser.newPage();
     try {
@@ -88,6 +106,7 @@ describe('Editor preview and budget flow', () => {
       await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Imported legacy resume JSON'));
       await page.locator('[data-tab="tab-content"]').click();
       const spm = page.locator('.education-editor-card').last();
+      await spm.locator('.edu-toggle').click();
       await spm.locator('[data-action="clear-grade"]').click();
       const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
       expect(draft.draftResume.education.at(-1).grade).toBeUndefined();
@@ -118,12 +137,12 @@ describe('Editor preview and budget flow', () => {
       expect(await cards.count()).toBe(beforeDuplicate);
       await cards.nth(movedIndex).locator('[data-grade="value"]').fill('3.8');
       await cards.nth(movedIndex).locator('[data-grade="scale"]').fill('4');
-      await cards.nth(movedIndex).locator('[data-list="subjects"]').fill('Bahasa Melayu: A-');
+      await cards.nth(movedIndex).locator('[data-list="activities"]').fill('Robotics Club');
       const profile = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
       expect(profile.version).toBe(2);
       expect(profile.visibility.education[profile.draftResume.education[movedIndex].id]).toBe(false);
       expect(profile.draftResume.education[movedIndex].grade.value).toBe(3.8);
-      expect(profile.draftResume.education[movedIndex].subjects[0].grade).toBe('A-');
+      expect(profile.draftResume.education[movedIndex].activities).toEqual(['Robotics Club']);
       const validation = await page.evaluate(async () => (await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: JSON.parse(localStorage.getItem('resume_gen_draft_v1')!).draftResume }) })).json());
       expect(validation.success).toBe(true);
       await page.locator('[data-tab="tab-source"]').click();
@@ -132,7 +151,7 @@ describe('Editor preview and budget flow', () => {
       await page.waitForFunction(() => /Saved Academic profile|Could not save profile/.test(document.getElementById('profile-library-message')?.textContent || ''));
       expect(await page.locator('#profile-library-message').textContent()).toBe('Saved Academic profile.');
       const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].bundle);
-      expect(saved.draftResume.education[movedIndex].subjects[0].name).toBe('Bahasa Melayu');
+      expect(saved.draftResume.education[movedIndex].activities).toEqual(['Robotics Club']);
       expect(saved.visibility.education[saved.draftResume.education[movedIndex].id]).toBe(false);
       const exported = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
       expect(exported.draftResume.education[movedIndex].grade.value).toBe(3.8);

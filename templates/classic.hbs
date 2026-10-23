@@ -84,8 +84,8 @@
         {{#if this.spmResults.overall}}<div class="edu-detail">SPM Results: {{this.spmResults.overall}}</div>{{/if}}
         {{#if this.spmResults.bahasaMelayu}}<div class="edu-detail">Bahasa Melayu: {{this.spmResults.bahasaMelayu}}</div>{{/if}}
         {{#each this.achievements}}<div class="edu-detail">• {{this}}</div>{{/each}}
+        {{#if this.activities.length}}<div class="edu-detail">Activities: {{#each this.activities}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</div>{{/if}}
         {{#if this.academicProject}}<div class="edu-detail">Academic Project: {{this.academicProject.title}}{{#if this.academicProject.description}} — {{this.academicProject.description}}{{/if}}</div>{{/if}}
-        {{#each this.subjects}}<div class="edu-detail">{{this.name}}{{#if this.grade}}: {{this.grade}}{{/if}}</div>{{/each}}
       </div>
       {{/each}}
     </section>
