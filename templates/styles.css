@@ -213,9 +213,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Education */
 .education-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  display: block;
   margin-bottom: 3pt;
 }
 
@@ -223,7 +221,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: flex;
   gap: 4pt;
   align-items: baseline;
+  break-inside: avoid;
+  break-after: avoid;
 }
+
+.edu-detail { font-size: var(--font-base-size); line-height: var(--line-height-base); margin: 1pt 0 0 8pt; break-inside: avoid; }
 
 .edu-degree {
   font-size: var(--font-base-size);
@@ -334,6 +336,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .reference-item, .highlight-list li { break-inside: avoid; }
 .experience-item.allow-page-split, .project-item.allow-page-split,
 .highlight-list li.allow-page-split { break-inside: auto; }
+.education-item { break-inside: auto; }
 .summary-text, .highlight-list li, .project-desc, .certs-inline { orphans: 2; widows: 2; }
 .readable-layout .item-header,
 .readable-layout .education-item { flex-wrap: wrap; gap: 2pt 8pt; }

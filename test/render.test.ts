@@ -3,6 +3,24 @@ import { renderResume } from '../src/render';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Template & Render Engine', () => {
+  it('keeps CGPA and SPM subjects independent across display modes', () => {
+    const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], grade: { value: 3.8, scale: 4 }, subjects: [{ name: 'Bahasa Melayu', grade: 'A-' }] }] };
+    const detailed = renderResume(resume, { educationConfig: { mode: 'detailed', showSubjects: true } });
+    expect(detailed).toContain('CGPA: 3.8 / 4');
+    expect(detailed).toContain('Bahasa Melayu: A-');
+    const compact = renderResume(resume, { educationConfig: { mode: 'compact', showSubjects: true } });
+    expect(compact).not.toContain('CGPA:');
+    expect(compact).not.toContain('Bahasa Melayu');
+    expect(resume.education[0].grade.value).toBe(3.8);
+  });
+  it('escapes academic details and omits missing values', () => {
+    const resume = { ...resumeFixture, education: [{ ...resumeFixture.education[0], achievements: ['<script>alert(1)</script>'] }] };
+    const html = renderResume(resume);
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).not.toContain('CGPA:');
+    expect(html).not.toContain('Academic Project:');
+  });
   it('protects short compounds while escaping markup and leaving long tokens wrappable', () => {
     const long = 'this-is-an-intentionally-extremely-long-hyphenated-token';
     const html = renderResume({ ...resumeFixture, basics: { ...resumeFixture.basics,

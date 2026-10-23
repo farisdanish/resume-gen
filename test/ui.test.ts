@@ -55,6 +55,65 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('keeps education visibility with its qualification after reorder and draft save', async () => {
+    const page = await browser.newPage({ acceptDownloads: true });
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-content"]').click();
+      const cards = page.locator('.education-editor-card');
+      await page.locator('#btn-add-education').click();
+      expect(await cards.count()).toBeGreaterThanOrEqual(2);
+      const movedIndex = await cards.count() - 2;
+      await cards.last().locator('[data-field="institution"]').fill('Second College');
+      await cards.last().locator('[data-field="degree"]').fill('Diploma');
+      await cards.last().locator('.edu-include').uncheck();
+      await cards.last().locator('[data-action="up"]').click();
+      expect(await cards.nth(movedIndex).locator('[data-field="degree"]').inputValue()).toBe('Diploma');
+      expect(await cards.nth(movedIndex).locator('.edu-include').isChecked()).toBe(false);
+      const beforeDuplicate = await cards.count();
+      await cards.nth(movedIndex).locator('[data-action="duplicate"]').click();
+      expect(await cards.count()).toBe(beforeDuplicate + 1);
+      page.once('dialog', (dialog) => dialog.accept());
+      await cards.nth(movedIndex + 1).locator('[data-action="remove"]').click();
+      expect(await cards.count()).toBe(beforeDuplicate);
+      await cards.nth(movedIndex).locator('[data-grade="value"]').fill('3.8');
+      await cards.nth(movedIndex).locator('[data-grade="scale"]').fill('4');
+      await cards.nth(movedIndex).locator('[data-list="subjects"]').fill('Bahasa Melayu: A-');
+      const profile = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(profile.version).toBe(2);
+      expect(profile.visibility.education[profile.draftResume.education[movedIndex].id]).toBe(false);
+      expect(profile.draftResume.education[movedIndex].grade.value).toBe(3.8);
+      expect(profile.draftResume.education[movedIndex].subjects[0].grade).toBe('A-');
+      const validation = await page.evaluate(async () => (await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: JSON.parse(localStorage.getItem('resume_gen_draft_v1')!).draftResume }) })).json());
+      expect(validation.success).toBe(true);
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('Academic profile');
+      await page.locator('#btn-save-named-profile').click();
+      await page.waitForFunction(() => /Saved Academic profile|Could not save profile/.test(document.getElementById('profile-library-message')?.textContent || ''));
+      expect(await page.locator('#profile-library-message').textContent()).toBe('Saved Academic profile.');
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_profiles_v1')!).profiles[0].bundle);
+      expect(saved.draftResume.education[movedIndex].subjects[0].name).toBe('Bahasa Melayu');
+      expect(saved.visibility.education[saved.draftResume.education[movedIndex].id]).toBe(false);
+      const exported = JSON.parse((await downloadedBytes(page, '#btn-export-json')).toString());
+      expect(exported.draftResume.education[movedIndex].grade.value).toBe(3.8);
+    } finally { await page.close(); }
+  }, 60000);
+
+  it('migrates v1 education visibility without losing academic records', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const legacy = { version: 1, draftResume: resumeFixture, visibility: { education: { 0: false } },
+        styleConfig: {}, sectionHeadings: {}, sectionOrder: ['summary', 'experience', 'education', 'skills', 'certifications', 'projects', 'references'], pageTarget: 1 };
+      await page.locator('#input-import-json').setInputFiles({ name: 'legacy-education.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+      await page.waitForFunction(() => document.getElementById('diagnostics-log')?.textContent?.includes('Restored complete tailored profile'));
+      const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(migrated.version).toBe(2);
+      expect(migrated.draftResume.education[0].degree).toBe(legacy.draftResume.education[0].degree);
+      expect(migrated.visibility.education[migrated.draftResume.education[0].id]).toBe(false);
+    } finally { await page.close(); }
+  }, 60000);
+
   // Catches a clipped first-page-only preview and zoom layouts that hide the last page.
   it.each([[2, 1], [12, 2], [32, 3]])('multipage-preview-reachability shows %i work entries on %i pages', async (count, expectedPages) => {
     const page = await browser.newPage();

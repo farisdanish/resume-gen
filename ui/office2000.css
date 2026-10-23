@@ -854,6 +854,11 @@ html, body {
 
 .pdf-page-list { width: var(--a4-width); }
 .pdf-pending { position: fixed; left: -100000px; top: 0; visibility: hidden; }
+.education-editor-card { margin: 6px 0; }
+.education-editor-card .editor-card-body { display: flex; flex-direction: column; gap: 5px; }
+.education-editor-card .editor-card-body label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
+.education-editor-card .edu-actions { display: flex; flex-wrap: wrap; gap: 3px; }
+.education-editor-card .edu-validation { color: #9b1c1c; font-size: 10px; }
 .pdf-page + .pdf-page { margin-top: 24px; }
 .pdf-page-label { height: 24px; line-height: 20px; color: white; font-size: 12px; text-align: center; }
 .pdf-sheet {

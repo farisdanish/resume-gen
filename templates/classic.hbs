@@ -71,12 +71,18 @@
       <div class="education-item">
         <div class="edu-title-group">
           <span class="edu-degree">{{this.degree}}</span>
+          {{#if this.specialization}}<span class="edu-specialization">({{this.specialization}})</span>{{/if}}
           <span class="contact-sep">|</span>
           <span class="edu-institution">{{this.institution}}</span>
         </div>
-        <div class="edu-meta">
+        {{#if this.classification}}<div class="edu-detail">{{this.classification}}</div>{{/if}}
+        {{#if this.showDates}}<div class="edu-meta">
           {{#if this.start}}{{this.start}} – {{/if}}{{#if this.end}}{{this.end}}{{else}}Present{{/if}}
-        </div>
+        </div>{{/if}}
+        {{#if this.grade}}<div class="edu-detail">{{#if this.grade.label}}{{this.grade.label}}{{else}}CGPA{{/if}}: {{this.grade.value}} / {{this.grade.scale}}</div>{{/if}}
+        {{#each this.achievements}}<div class="edu-detail">• {{this}}</div>{{/each}}
+        {{#if this.academicProject}}<div class="edu-detail">Academic Project: {{this.academicProject.title}}{{#if this.academicProject.description}} — {{this.academicProject.description}}{{/if}}</div>{{/if}}
+        {{#each this.subjects}}<div class="edu-detail">{{this.name}}{{#if this.grade}}: {{this.grade}}{{/if}}</div>{{/each}}
       </div>
       {{/each}}
     </section>

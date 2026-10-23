@@ -344,12 +344,26 @@
               </div>
             </fieldset>
 
-            <!-- Projects & Education Section -->
+            <!-- Education Section -->
             <fieldset class="win-fieldset">
-              <legend class="win-legend">Education & Projects</legend>
+              <legend class="win-legend">Education</legend>
+              <label class="form-label" for="education-mode">Detail level:</label>
+              <select id="education-mode" class="win-input"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="detailed">Detailed</option></select>
+              <div id="education-display-controls">
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showDates">Dates</label>
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showSpecialization">Specialization</label>
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showGrade">CGPA / GPA</label>
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showAchievements">Achievements</label>
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showAcademicProject">Academic project</label>
+                <label class="win-checkbox-row"><input type="checkbox" data-education-display="showSubjects">Subject results</label>
+              </div>
               <div id="edu-items-container">
                 <!-- Dynamically populated education items -->
               </div>
+              <button type="button" id="btn-add-education" class="win-button win-button-sm">+ Add Qualification</button>
+            </fieldset>
+            <fieldset class="win-fieldset">
+              <legend class="win-legend">Projects</legend>
               <div id="proj-items-container" style="margin-top: 8px;">
                 <!-- Dynamically populated project items -->
               </div>

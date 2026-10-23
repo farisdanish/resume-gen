@@ -3,7 +3,8 @@ import { PdfPreview } from './pdf-preview.js';
 (() => {
   const STORAGE_KEY = 'resume_gen_draft_v1';
   const ASSISTANT_KEY = 'resume_gen_office_assistant_enabled';
-  const PROFILE_VERSION = 1;
+  const PROFILE_VERSION = 2;
+  const DEFAULT_EDUCATION_CONFIG = { mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showSubjects: false, showDates: true };
   const DEFAULT_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects', 'references'];
   const SECTION_LABELS = {
     summary: 'Summary',
@@ -30,7 +31,7 @@ import { PdfPreview } from './pdf-preview.js';
   let visibility = {
     contact: { phone: true, email: true, location: true, github: true, linkedin: true, website: true },
     work: {},      // index -> boolean
-    education: {}, // index -> boolean
+    education: {}, // stable education ID -> boolean
     projects: {},  // index -> boolean
     references: {}, // index -> boolean
     headshot: true,
@@ -56,6 +57,7 @@ import { PdfPreview } from './pdf-preview.js';
   };
   let sectionOrder = [...DEFAULT_SECTION_ORDER];
   let pageTarget = 1;
+  let educationConfig = { ...DEFAULT_EDUCATION_CONFIG };
   let currentBudgetState = 'waiting';
   const dismissedAssistantStates = new Set();
 
@@ -375,7 +377,7 @@ import { PdfPreview } from './pdf-preview.js';
 
   function currentProfileBundle() {
     return JSON.parse(JSON.stringify({ version: PROFILE_VERSION, draftResume, visibility, styleConfig,
-      sectionHeadings, sectionOrder, pageTarget, savedAt: new Date().toISOString() }));
+      sectionHeadings, sectionOrder, pageTarget, educationConfig, savedAt: new Date().toISOString() }));
   }
 
   function profileFingerprint(bundle) {
@@ -390,6 +392,7 @@ import { PdfPreview } from './pdf-preview.js';
     sectionHeadings = profile.sectionHeadings;
     sectionOrder = profile.sectionOrder;
     pageTarget = profile.pageTarget;
+    educationConfig = profile.educationConfig;
   }
 
   function refreshLibraryButtons() {
@@ -532,8 +535,7 @@ import { PdfPreview } from './pdf-preview.js';
       if (!raw) return false;
       const bundle = JSON.parse(raw);
       if (!bundle?.draftResume) return false;
-      const profile = parseImportedProfile({ ...bundle, version: PROFILE_VERSION,
-        sectionOrder: normalizeSectionOrder(bundle.sectionOrder) });
+      const profile = parseImportedProfile(bundle);
       applyProfile(profile);
       return true;
     } catch (error) {
@@ -575,7 +577,7 @@ import { PdfPreview } from './pdf-preview.js';
 
     // 3. Filter Education items
     if (cloned.education && Array.isArray(cloned.education)) {
-      cloned.education = cloned.education.filter((_, idx) => visibility.education[idx] !== false);
+      cloned.education = cloned.education.filter((item) => visibility.education[item.id] !== false);
     }
 
     // 4. Filter Projects items
@@ -935,25 +937,145 @@ import { PdfPreview } from './pdf-preview.js';
   }
 
   // --- Education & Projects Editor UI ---
-  function renderEduAndProjectsEditor() {
-    if (eduItemsContainer) {
-      eduItemsContainer.innerHTML = '<div style="font-weight: bold; font-size: 10px; margin-bottom: 4px;">Education:</div>';
-      (draftResume.education || []).forEach((edu, eduIdx) => {
-        const isIncluded = visibility.education[eduIdx] !== false;
-        const div = document.createElement('div');
-        div.style.marginBottom = '4px';
-        div.innerHTML = `
-          <label class="win-checkbox-row">
-            <input type="checkbox" class="chk-edu-include" data-idx="${eduIdx}" ${isIncluded ? 'checked' : ''}>
-            <span><b>${escapeHtml(edu.degree || '')}</b> - ${escapeHtml(edu.institution || '')}</span>
-          </label>
-        `;
-        div.querySelector('.chk-edu-include').addEventListener('change', (e) => {
-          visibility.education[eduIdx] = e.target.checked;
+  function educationId() { return `edu-${crypto.randomUUID()}`; }
+
+  function normalizeEducation(resume) {
+    const used = new Set();
+    (resume.education || []).forEach((item, index) => {
+      const seed = `${item.institution || ''}|${item.degree || ''}|${item.start || ''}|${item.end || ''}|${index}`;
+      let hash = 2166136261;
+      for (const char of seed) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+      let id = item.id || `edu-${(hash >>> 0).toString(36)}`;
+      if (!item.id) for (let suffix = 2; used.has(id); suffix++) id = `edu-${(hash >>> 0).toString(36)}-${suffix}`;
+      item.id = id;
+      used.add(id);
+      item.achievements ||= [];
+      item.subjects ||= [];
+      item.subjects.forEach((subject, subjectIndex) => { subject.id ||= `${id}-subject-${subjectIndex + 1}`; });
+    });
+    return resume;
+  }
+
+  function renderEducationEditor() {
+    eduItemsContainer.replaceChildren();
+    document.getElementById('education-mode').value = educationConfig.mode;
+    document.querySelectorAll('[data-education-display]').forEach((input) => { input.checked = educationConfig[input.dataset.educationDisplay]; });
+    (draftResume.education || []).forEach((edu, index) => {
+      const card = document.createElement('div');
+      card.className = 'editor-card education-editor-card';
+      card.innerHTML = `<div class="editor-card-header"><label class="win-checkbox-row"><input class="edu-include" type="checkbox" ${visibility.education[edu.id] !== false ? 'checked' : ''}><span>${escapeHtml(edu.degree || 'New qualification')} — ${escapeHtml(edu.institution || 'Institution')}</span></label></div>
+        <div class="editor-card-body">
+          <div class="edu-actions"><button type="button" data-action="up">↑ Move Up</button><button type="button" data-action="down">↓ Move Down</button><button type="button" data-action="duplicate">Duplicate</button><button type="button" data-action="remove">Remove</button></div>
+          <label>Level <select data-field="level"><option value="">Unspecified</option>${['phd','masters','bachelor','diploma','certificate','spm','other'].map((level) => `<option value="${level}">${level.toUpperCase()}</option>`).join('')}</select></label>
+          ${['institution','degree','type','specialization','start','end'].map((field) => `<label>${field}<input class="win-input" data-field="${field}" type="text"></label>`).join('')}
+          <label>Grade label<input class="win-input" data-grade="label" type="text" placeholder="CGPA"></label>
+          <label>Grade value<input class="win-input" data-grade="value" type="number" min="0" step="any"></label>
+          <label>Grade scale<input class="win-input" data-grade="scale" type="number" min="0.01" step="any"></label>
+          <button type="button" data-action="clear-grade">Clear Grade</button>
+          <label>Achievements (one per line)<textarea class="win-textarea" data-list="achievements"></textarea></label>
+          <label>Academic project title<input class="win-input" data-project="title" type="text"></label>
+          <label>Academic project description<textarea class="win-textarea" data-project="description"></textarea></label>
+          <label>Subjects (one per line, name: grade)<textarea class="win-textarea" data-list="subjects"></textarea></label>
+          <div class="edu-validation" role="alert" hidden></div>
+        </div>`;
+      eduItemsContainer.appendChild(card);
+      const validationId = `edu-validation-${index}`;
+      card.querySelector('.edu-validation').id = validationId;
+      card.querySelectorAll('[data-field], [data-grade], [data-project]').forEach((input) => input.setAttribute('aria-describedby', validationId));
+      card.querySelector('.edu-include').addEventListener('change', (event) => { visibility.education[edu.id] = event.target.checked; scheduleDebouncedPreview(); });
+      card.querySelectorAll('[data-field]').forEach((input) => {
+        input.value = edu[input.dataset.field] ?? '';
+        input.addEventListener('input', () => {
+          const field = input.dataset.field;
+          const value = input.value.trim();
+          if (field === 'end') edu.end = value || null;
+          else if (['type','level','specialization','start'].includes(field) && !value) delete edu[field];
+          else edu[field] = input.value;
+          showEducationValidation(card, edu);
           scheduleDebouncedPreview();
         });
-        eduItemsContainer.appendChild(div);
       });
+      card.querySelectorAll('[data-grade]').forEach((input) => {
+        input.value = edu.grade?.[input.dataset.grade] ?? '';
+        input.addEventListener('input', () => {
+          const value = card.querySelector('[data-grade="value"]').value;
+          const scale = card.querySelector('[data-grade="scale"]').value;
+          const label = card.querySelector('[data-grade="label"]').value.trim();
+          if (value || scale) edu.grade = { value: value === '' ? -1 : Number(value), scale: scale === '' ? 0 : Number(scale), ...(label ? { label } : {}) };
+          else delete edu.grade;
+          showEducationValidation(card, edu);
+          scheduleDebouncedPreview();
+        });
+      });
+      const achievements = card.querySelector('[data-list="achievements"]');
+      achievements.value = (edu.achievements || []).join('\n');
+      achievements.addEventListener('input', () => { edu.achievements = achievements.value.split('\n').map((value) => value.trim()).filter(Boolean); scheduleDebouncedPreview(); });
+      const subjects = card.querySelector('[data-list="subjects"]');
+      subjects.value = (edu.subjects || []).map((subject) => `${subject.name}${subject.grade ? `: ${subject.grade}` : ''}`).join('\n');
+      subjects.addEventListener('input', () => {
+        edu.subjects = subjects.value.split('\n').map((line, subjectIndex) => {
+          const [name, ...gradeParts] = line.split(':');
+          return { id: edu.subjects?.[subjectIndex]?.id || `${edu.id}-subject-${crypto.randomUUID()}`, name: name.trim(), ...(gradeParts.join(':').trim() ? { grade: gradeParts.join(':').trim() } : {}) };
+        }).filter((subject) => subject.name);
+        scheduleDebouncedPreview();
+      });
+      card.querySelectorAll('[data-project]').forEach((input) => {
+        input.value = edu.academicProject?.[input.dataset.project] || '';
+        input.addEventListener('input', () => {
+          const title = card.querySelector('[data-project="title"]').value.trim();
+          const description = card.querySelector('[data-project="description"]').value.trim();
+          edu.academicProject = title || description ? { title, ...(description ? { description } : {}) } : undefined;
+          showEducationValidation(card, edu);
+          scheduleDebouncedPreview();
+        });
+      });
+      card.querySelectorAll('[data-action]').forEach((button) => button.addEventListener('click', () => {
+        const action = button.dataset.action;
+        if (action === 'clear-grade') { delete edu.grade; renderEducationEditor(); scheduleDebouncedPreview(); return; }
+        if (action === 'remove') {
+          if (draftResume.education.length === 1) { alert('At least one qualification is required.'); return; }
+          if ((edu.institution || edu.degree || edu.grade || edu.subjects?.length) && !confirm('Remove this qualification?')) return;
+          draftResume.education.splice(index, 1); delete visibility.education[edu.id];
+        } else if (action === 'duplicate') {
+          const copy = structuredClone(edu); copy.id = educationId(); copy.degree = `${copy.degree || ''} (Copy)`;
+          copy.subjects = (copy.subjects || []).map((subject) => ({ ...subject, id: `${copy.id}-subject-${crypto.randomUUID()}` }));
+          draftResume.education.splice(index + 1, 0, copy); visibility.education[copy.id] = visibility.education[edu.id] !== false;
+        } else {
+          const target = index + (action === 'up' ? -1 : 1);
+          if (target < 0 || target >= draftResume.education.length) return;
+          [draftResume.education[index], draftResume.education[target]] = [draftResume.education[target], draftResume.education[index]];
+        }
+        renderEducationEditor(); scheduleDebouncedPreview();
+      }));
+      showEducationValidation(card, edu);
+    });
+  }
+
+  function showEducationValidation(card, edu) {
+    const issues = [];
+    if (!edu.institution?.trim()) issues.push('Institution is required.');
+    if (!edu.degree?.trim()) issues.push('Qualification title is required.');
+    if (edu.grade && (edu.grade.value < 0 || edu.grade.scale <= 0 || edu.grade.value > edu.grade.scale)) issues.push('Enter a grade between zero and its scale.');
+    if (edu.academicProject && !edu.academicProject.title) issues.push('Academic project title is required.');
+    const validDate = (value) => /^\d{4}(-(0[1-9]|1[0-2]))?$/.test(value);
+    if (edu.start && !validDate(edu.start)) issues.push('Start date must be YYYY or YYYY-MM.');
+    if (edu.end && !validDate(edu.end)) issues.push('End date must be YYYY or YYYY-MM.');
+    const monthIndex = (value, fallback) => { const [year, month = fallback] = value.split('-'); return Number(year) * 12 + Number(month); };
+    if (edu.start && edu.end && validDate(edu.start) && validDate(edu.end)
+      && monthIndex(edu.start, '01') > monthIndex(edu.end, '12')) issues.push('Start date must be before end date.');
+    const message = card.querySelector('.edu-validation'); message.textContent = issues.join(' '); message.hidden = !issues.length;
+  }
+
+  document.getElementById('btn-add-education')?.addEventListener('click', () => {
+    if (!draftResume) return;
+    draftResume.education.push({ id: educationId(), institution: '', degree: '', end: null, achievements: [], subjects: [] });
+    renderEducationEditor(); eduItemsContainer.lastElementChild.querySelector('[data-field="institution"]').focus(); scheduleDebouncedPreview();
+  });
+  document.getElementById('education-mode')?.addEventListener('change', (event) => { educationConfig.mode = event.target.value; scheduleDebouncedPreview(); });
+  document.querySelectorAll('[data-education-display]').forEach((input) => input.addEventListener('change', () => { educationConfig[input.dataset.educationDisplay] = input.checked; scheduleDebouncedPreview(); }));
+  function renderEduAndProjectsEditor() {
+    if (eduItemsContainer) {
+      renderEducationEditor();
     }
 
     if (projItemsContainer) {
@@ -1518,6 +1640,7 @@ import { PdfPreview } from './pdf-preview.js';
           headings: sectionHeadings,
           sectionOrder,
           pageTarget,
+          educationConfig,
         }),
       });
 
@@ -1578,12 +1701,14 @@ import { PdfPreview } from './pdf-preview.js';
           headings: sectionHeadings,
           sectionOrder,
           pageTarget,
+          educationConfig,
         }),
       });
 
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
         log(`PDF generation failed: ${errorJson.error || res.statusText}`, 'error');
+        errorJson.issues?.forEach((issue) => log(`[Validation] ${issue.path.join('.')}: ${issue.message}`, 'warn'));
         setStatus('PDF generation failed', 'Error');
         return;
       }
@@ -1639,6 +1764,7 @@ import { PdfPreview } from './pdf-preview.js';
       };
       sectionOrder = [...DEFAULT_SECTION_ORDER];
       pageTarget = 1;
+      educationConfig = { ...DEFAULT_EDUCATION_CONFIG };
       saveStateToStorage();
       populateContentForm();
       renderPreview();
@@ -1661,6 +1787,7 @@ import { PdfPreview } from './pdf-preview.js';
       sectionHeadings,
       sectionOrder,
       pageTarget,
+      educationConfig,
       savedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
@@ -1686,7 +1813,7 @@ import { PdfPreview } from './pdf-preview.js';
     return {
       contact: Object.fromEntries(Object.keys(contactDefaults).map((key) => [key, source.contact?.[key] !== false])),
       work: normalizeMap(source.work, resume.work?.length || 0),
-      education: normalizeMap(source.education, resume.education?.length || 0),
+      education: Object.fromEntries((resume.education || []).map((item, index) => [item.id, source.education?.[item.id] ?? source.education?.[index] ?? true])),
       projects: normalizeMap(source.projects, resume.projects?.length || 0),
       references: normalizeMap(source.references, resume.references?.mode === 'entries' ? resume.references.entries.length : 0),
       headshot: source.headshot !== false,
@@ -1695,10 +1822,12 @@ import { PdfPreview } from './pdf-preview.js';
 
   function parseImportedProfile(parsed) {
     const isLegacy = parsed && parsed.basics && Array.isArray(parsed.work);
-    if (!isLegacy && parsed?.version !== PROFILE_VERSION) {
+    if (!isLegacy && ![1, PROFILE_VERSION].includes(parsed?.version)) {
       throw new Error(`Unsupported profile version: ${parsed?.version ?? 'missing'}`);
     }
-    const resume = isLegacy ? parsed : parsed.draftResume;
+    const sourceResume = isLegacy ? parsed : parsed?.draftResume;
+    if (!sourceResume) throw new Error('Invalid resume profile: missing draftResume');
+    const resume = normalizeEducation(JSON.parse(JSON.stringify(sourceResume)));
     if (!resume || !resume.basics || !Array.isArray(resume.work)) {
       throw new Error('Invalid resume profile: missing draftResume, basics, or work');
     }
@@ -1736,6 +1865,11 @@ import { PdfPreview } from './pdf-preview.js';
     const nextOrder = normalizeSectionOrder(requestedOrder);
     const nextPageTarget = isLegacy ? 1 : (parsed.pageTarget ?? 1);
     if (![1, 2].includes(nextPageTarget)) throw new Error('Invalid profile page target');
+    const nextEducationConfig = { ...DEFAULT_EDUCATION_CONFIG, ...(!isLegacy && parsed.version === 2 ? parsed.educationConfig : {}) };
+    if (!['compact', 'balanced', 'detailed'].includes(nextEducationConfig.mode)
+      || Object.keys(DEFAULT_EDUCATION_CONFIG).some((key) => key !== 'mode' && typeof nextEducationConfig[key] !== 'boolean')) {
+      throw new Error('Invalid education display configuration');
+    }
     return {
       isLegacy,
       draftResume: JSON.parse(JSON.stringify(resume)),
@@ -1744,6 +1878,7 @@ import { PdfPreview } from './pdf-preview.js';
       sectionHeadings: { ...nextHeadings },
       sectionOrder: [...nextOrder],
       pageTarget: nextPageTarget,
+      educationConfig: nextEducationConfig,
     };
   }
 
@@ -1758,6 +1893,7 @@ import { PdfPreview } from './pdf-preview.js';
         headings: profile.sectionHeadings,
         sectionOrder: profile.sectionOrder,
         pageTarget: profile.pageTarget,
+        educationConfig: profile.educationConfig,
       }),
     });
     if (!res.ok) {

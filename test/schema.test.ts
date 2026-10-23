@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
+  ResumeSchema,
+  EducationDisplayConfigSchema,
   HeadshotSchema,
   ReferencesConfigSchema,
   SectionOrderSchema,
@@ -7,6 +9,27 @@ import {
   ProjectSchema,
 } from '../src/schema';
 import { DEFAULT_SECTION_ORDER } from '../src/constants';
+import resumeFixture from '../fixtures/resume.json';
+
+describe('Education customization', () => {
+  test('normalizes legacy entries without inventing academic claims', () => {
+    const parsed = ResumeSchema.parse(resumeFixture);
+    expect(parsed.education[0].id).toMatch(/^edu-/);
+    expect(parsed.education[0].achievements).toEqual([]);
+    expect(parsed.education[0].subjects).toEqual([]);
+    expect(ResumeSchema.parse(resumeFixture).education[0].id).toBe(parsed.education[0].id);
+  });
+
+  test('rejects duplicate IDs and grades above their scale', () => {
+    const parsed = ResumeSchema.parse(resumeFixture);
+    expect(ResumeSchema.safeParse({ ...parsed, education: [parsed.education[0], parsed.education[0]] }).success).toBe(false);
+    expect(ResumeSchema.safeParse({ ...parsed, education: [{ ...parsed.education[0], grade: { value: 5, scale: 4 } }] }).success).toBe(false);
+  });
+
+  test('rejects unsupported display modes', () => {
+    expect(EducationDisplayConfigSchema.safeParse({ mode: 'verbose' }).success).toBe(false);
+  });
+});
 
 describe('SectionOrderSchema', () => {
   test('accepts the canonical and reordered complete section sets', () => {

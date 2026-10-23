@@ -12,6 +12,7 @@ import {
   StyleConfigSchema,
   SectionHeadingsSchema,
   SectionOrderSchema,
+  EducationDisplayConfigSchema,
 } from './schema';
 import { renderResume } from './render';
 import { generatePdf } from './pdf';
@@ -108,7 +109,9 @@ app.post('/api/preview', async (c) => {
     }
     const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
-    const html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
+    const educationConfigResult = EducationDisplayConfigSchema.safeParse(body.educationConfig);
+    if (!educationConfigResult.success) return c.json({ success: false, error: 'Invalid education display configuration', issues: educationConfigResult.error.issues }, 400);
+    const html = renderResume(validation.data, { styleConfig, headings, sectionOrder, educationConfig: educationConfigResult.data });
     const { buffer, layout, pageCount, isSinglePage } = await generatePdf({ html });
     return c.json({
       success: true,
@@ -169,7 +172,9 @@ app.post('/api/generate-pdf', async (c) => {
       }
       const sectionOrder = orderValidation.success ? orderValidation.data : undefined;
 
-      html = renderResume(validation.data, { styleConfig, headings, sectionOrder });
+      const educationConfigResult = EducationDisplayConfigSchema.safeParse(body.educationConfig);
+      if (!educationConfigResult.success) return c.json({ success: false, error: 'Invalid education display configuration', issues: educationConfigResult.error.issues }, 400);
+      html = renderResume(validation.data, { styleConfig, headings, sectionOrder, educationConfig: educationConfigResult.data });
     }
 
     const { buffer, pageCount, isSinglePage } = await generatePdf({ html });

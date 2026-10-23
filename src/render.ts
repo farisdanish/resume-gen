@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Handlebars from 'handlebars';
-import type { Resume, SectionOrder, StyleConfigInput } from './schema';
+import { EducationDisplayConfigSchema, ResumeSchema, type EducationDisplayConfig, type SectionOrder, type StyleConfigInput } from './schema';
 import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS } from './constants';
 import { formatDisplayDate } from './date';
 
@@ -37,9 +37,11 @@ export interface RenderOptions {
   styleConfig?: StyleConfigInput;
   headings?: Record<string, string>;
   sectionOrder?: SectionOrder;
+  educationConfig?: Partial<EducationDisplayConfig>;
 }
 
-export function renderResume(resume: Resume, options: RenderOptions = {}): string {
+export function renderResume(input: unknown, options: RenderOptions = {}): string {
+  const resume = ResumeSchema.parse(input);
   const fontCss = `
     @font-face {
       font-family: 'ResumeSans';
@@ -80,10 +82,23 @@ export function renderResume(resume: Resume, options: RenderOptions = {}): strin
   `;
 
   const { styleConfig, headings = {}, sectionOrder = DEFAULT_SECTION_ORDER } = options;
+  const educationConfig = EducationDisplayConfigSchema.parse(options.educationConfig);
+  const detail = educationConfig.mode;
   const displayResume = {
     ...resume,
     work: resume.work.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
-    education: resume.education.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
+    education: resume.education.map((item) => ({
+      ...item,
+      start: educationConfig.showDates ? formatDisplayDate(item.start, styleConfig?.dateFormat) : undefined,
+      end: educationConfig.showDates ? formatDisplayDate(item.end, styleConfig?.dateFormat) : undefined,
+      showDates: educationConfig.showDates,
+      classification: item.level ? (item.level === 'spm' ? 'SPM' : item.level[0].toUpperCase() + item.level.slice(1)) : item.type,
+      specialization: detail !== 'compact' && educationConfig.showSpecialization ? item.specialization : undefined,
+      grade: detail !== 'compact' && educationConfig.showGrade ? item.grade : undefined,
+      achievements: detail !== 'compact' && educationConfig.showAchievements ? item.achievements : [],
+      academicProject: detail === 'detailed' && educationConfig.showAcademicProject ? item.academicProject : undefined,
+      subjects: detail === 'detailed' && educationConfig.showSubjects ? item.subjects : [],
+    })),
   };
 
   let dynamicOverrides = '';

@@ -38,13 +38,33 @@ export const WorkExperienceSchema = z
     path: ['end'],
   });
 
+export const EducationDisplayConfigSchema = z.object({
+  mode: z.enum(['compact', 'balanced', 'detailed']).default('balanced'),
+  showGrade: z.boolean().default(true),
+  showSpecialization: z.boolean().default(true),
+  showAcademicProject: z.boolean().default(false),
+  showAchievements: z.boolean().default(true),
+  showSubjects: z.boolean().default(false),
+  showDates: z.boolean().default(true),
+}).default({ mode: 'balanced', showGrade: true, showSpecialization: true, showAcademicProject: false, showAchievements: true, showSubjects: false, showDates: true });
+export type EducationDisplayConfig = z.infer<typeof EducationDisplayConfigSchema>;
+
 export const EducationSchema = z
   .object({
+    id: z.string().min(1),
     institution: z.string().min(1),
     degree: z.string().min(1),
     start: DatePointSchema.optional(), // Optional: allows lone graduation dates ("2024")
     end: DatePointSchema.nullable(),   // null = "Present" (ongoing studies)
     type: z.string().optional(),
+    level: z.enum(['phd', 'masters', 'bachelor', 'diploma', 'certificate', 'spm', 'other']).optional(),
+    specialization: z.string().min(1).optional(),
+    grade: z.object({ value: z.number().min(0), scale: z.number().positive(), label: z.string().min(1).optional() })
+      .refine((grade) => grade.value <= grade.scale, { message: 'Grade cannot exceed scale', path: ['value'] }).optional(),
+    achievements: z.array(z.string().min(1)).default([]),
+    academicProject: z.object({ title: z.string().min(1), description: z.string().min(1).optional() }).optional(),
+    subjects: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), grade: z.string().min(1).optional() }))
+      .refine((subjects) => new Set(subjects.map((subject) => subject.id)).size === subjects.length, 'Subject IDs must be unique').default([]),
   })
   .refine(
     (data) => !data.start || !data.end || toMonthIndex(data.start, '01') <= toMonthIndex(data.end, '12'),
@@ -99,7 +119,25 @@ export const HeadshotSchema = z.object({
   position: z.enum(['left', 'right']),
 });
 
-export const ResumeSchema = z.object({
+export function normalizeEducationInput(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || !Array.isArray((input as any).education)) return input;
+  const resume = input as any;
+  const used = new Set<string>();
+  return { ...resume, education: resume.education.map((entry: any, index: number) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    const seed = `${entry.institution || ''}|${entry.degree || ''}|${entry.start || ''}|${entry.end || ''}|${index}`;
+    let hash = 2166136261;
+    for (const char of seed) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    const base = entry.id ?? `edu-${(hash >>> 0).toString(36)}`;
+    let id = base;
+    if (entry.id === undefined) for (let suffix = 2; used.has(id); suffix++) id = `${base}-${suffix}`;
+    used.add(id);
+    return { ...entry, id, subjects: Array.isArray(entry.subjects) ? entry.subjects.map((subject: any, subjectIndex: number) =>
+      subject && typeof subject === 'object' ? { ...subject, id: subject.id ?? `${id}-subject-${subjectIndex + 1}` } : subject) : entry.subjects };
+  }) };
+}
+
+export const ResumeSchema = z.preprocess(normalizeEducationInput, z.object({
   basics: z.object({
     name: z.string().min(1),
     title: z.string().min(1),
@@ -108,12 +146,12 @@ export const ResumeSchema = z.object({
     headshot: HeadshotSchema.optional(),
   }),
   work: z.array(WorkExperienceSchema).min(1),
-  education: z.array(EducationSchema).min(1),
+  education: z.array(EducationSchema).min(1).refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Education IDs must be unique'),
   skills: z.array(SkillCategorySchema).min(1),
   certifications: z.array(z.string()).default([]),
   projects: z.array(ProjectSchema).default([]),
   references: ReferencesConfigSchema.optional(),
-});
+}));
 
 export type Resume = z.infer<typeof ResumeSchema>;
 
