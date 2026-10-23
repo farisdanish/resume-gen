@@ -92,7 +92,6 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
       start: educationConfig.showDates ? formatDisplayDate(item.start, styleConfig?.dateFormat) : undefined,
       end: educationConfig.showDates ? formatDisplayDate(item.end, styleConfig?.dateFormat) : undefined,
       showDates: educationConfig.showDates,
-      classification: item.level ? (item.level === 'spm' ? 'SPM' : item.level[0].toUpperCase() + item.level.slice(1)) : item.type,
       specialization: detail !== 'compact' && educationConfig.showSpecialization ? item.specialization : undefined,
       grade: detail !== 'compact' && educationConfig.showGrade ? item.grade : undefined,
       achievements: detail !== 'compact' && educationConfig.showAchievements ? item.achievements : [],

@@ -966,8 +966,7 @@ import { PdfPreview } from './pdf-preview.js';
       card.innerHTML = `<div class="editor-card-header"><label class="win-checkbox-row"><input class="edu-include" type="checkbox" ${visibility.education[edu.id] !== false ? 'checked' : ''}><span>${escapeHtml(edu.degree || 'New qualification')} — ${escapeHtml(edu.institution || 'Institution')}</span></label></div>
         <div class="editor-card-body">
           <div class="edu-actions"><button type="button" data-action="up">↑ Move Up</button><button type="button" data-action="down">↓ Move Down</button><button type="button" data-action="duplicate">Duplicate</button><button type="button" data-action="remove">Remove</button></div>
-          <label>Level <select data-field="level"><option value="">Unspecified</option>${['phd','masters','bachelor','diploma','certificate','spm','other'].map((level) => `<option value="${level}">${level.toUpperCase()}</option>`).join('')}</select></label>
-          ${['institution','degree','type','specialization','start','end'].map((field) => `<label>${field}<input class="win-input" data-field="${field}" type="text"></label>`).join('')}
+          ${['institution','degree','specialization','start','end'].map((field) => `<label>${field}<input class="win-input" data-field="${field}" type="text"></label>`).join('')}
           <label>Grade label<input class="win-input" data-grade="label" type="text" placeholder="CGPA"></label>
           <label>Grade value<input class="win-input" data-grade="value" type="number" min="0" step="any"></label>
           <label>Grade scale<input class="win-input" data-grade="scale" type="number" min="0.01" step="any"></label>
@@ -989,7 +988,7 @@ import { PdfPreview } from './pdf-preview.js';
           const field = input.dataset.field;
           const value = input.value.trim();
           if (field === 'end') edu.end = value || null;
-          else if (['type','level','specialization','start'].includes(field) && !value) delete edu[field];
+          else if (['specialization','start'].includes(field) && !value) delete edu[field];
           else edu[field] = input.value;
           showEducationValidation(card, edu);
           scheduleDebouncedPreview();

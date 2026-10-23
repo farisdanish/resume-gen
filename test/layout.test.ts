@@ -13,6 +13,25 @@ describe('Design application and measured budget', () => {
   beforeAll(async () => { browser = await chromium.launch({ headless: true }); });
   afterAll(async () => { await browser?.close(); });
 
+  it('keeps education dates right aligned without rendering qualification levels', async () => {
+    const data = { ...resume, education: [{ ...resume.education[0], level: 'bachelor', degree: 'Bachelor of Computer Science with Honours (Software Engineering)', institution: 'Universiti Malaysia Sabah (UMS)' }] };
+    const html = renderResume(data);
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html);
+      const layout = await page.locator('.education-item').first().evaluate((item) => {
+        const header = item.querySelector('.edu-header')!.getBoundingClientRect();
+        const title = item.querySelector('.edu-title-group')!.getBoundingClientRect();
+        const dates = item.querySelector('.edu-meta')!.getBoundingClientRect();
+        return { headerRight: header.right, titleRight: title.right, datesLeft: dates.left, datesRight: dates.right, titleTop: title.top, datesTop: dates.top };
+      });
+      expect(layout.datesRight).toBeCloseTo(layout.headerRight, 0);
+      expect(layout.titleRight).toBeLessThan(layout.datesLeft);
+      expect(Math.abs(layout.titleTop - layout.datesTop)).toBeLessThan(8);
+      expect(await page.locator('.education-item .edu-detail').count()).toBe(0);
+    } finally { await page.close(); }
+  });
+
   // Catches a short entry splitting between its heading and final content.
   it.each(['projects', 'experience'] as const)('section-continuation keeps a short %s entry intact at a page boundary', async (section) => {
     const data = structuredClone(compatibility);

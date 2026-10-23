@@ -217,13 +217,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   margin-bottom: 3pt;
 }
 
-.edu-title-group {
-  display: flex;
-  gap: 4pt;
+.edu-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8pt;
   align-items: baseline;
   break-inside: avoid;
   break-after: avoid;
 }
+
+.edu-title-group { min-width: 0; overflow-wrap: anywhere; }
 
 .edu-detail { font-size: var(--font-base-size); line-height: var(--line-height-base); margin: 1pt 0 0 8pt; break-inside: avoid; }
 
@@ -242,6 +245,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   font-size: calc(var(--font-base-size) * 8 / 8.5);
   color: #718096;
   white-space: nowrap;
+  text-align: right;
 }
 
 /* Skills */
@@ -343,7 +347,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .readable-layout .item-title-group,
 .readable-layout .edu-title-group { display: block; min-width: 0; overflow-wrap: anywhere; }
 .readable-layout .item-meta,
-.readable-layout .edu-meta { white-space: normal; }
+.readable-layout .edu-meta { white-space: nowrap; }
 .readable-layout .skill-cat-items { min-width: 0; overflow-wrap: anywhere; }
 
 @media print {
