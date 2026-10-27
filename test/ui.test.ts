@@ -55,6 +55,55 @@ describe('Editor preview and budget flow', () => {
     return Buffer.concat(chunks);
   }
 
+  it('authors all resume sections from a blank draft and keeps them after reload', async () => {
+    const page = await browser.newPage();
+    page.on('dialog', (dialog) => dialog.accept());
+    try {
+      await openEditor(page);
+      await page.locator('#btn-start-blank').click();
+      await page.locator('#edit-name').fill('Smoke Candidate');
+      await page.locator('#btn-add-work').click();
+      const work = page.locator('#work-items-container .editor-card').last();
+      await work.locator('.input-work-role').fill('Engineer');
+      await work.locator('.input-work-company').fill('Example Works');
+      await work.locator('.input-work-start').fill('2025-01');
+      await work.locator('.btn-add-bullet').click();
+      await work.locator('.bullet-textarea').fill('Built a scheduling service.');
+      await page.locator('#btn-add-education').click();
+      const education = page.locator('.education-editor-card').last();
+      await education.locator('[data-field="degree"]').fill('BSc Computer Science');
+      await education.locator('[data-field="institution"]').fill('Example University');
+      await education.locator('[data-field="end"]').fill('2024');
+      await page.locator('#btn-add-category').click();
+      const category = page.locator('#skills-items-container .editor-card').last();
+      await category.locator('.input-category-name').fill('Development');
+      await category.locator('.input-new-skill').fill('TypeScript');
+      await category.locator('.btn-add-skill').click();
+      await page.locator('#btn-add-project').click();
+      const project = page.locator('#proj-items-container > div').last();
+      await project.locator('.input-project-title').fill('Schedule App');
+      await project.locator('.input-project-description').fill('Built a planning application.');
+      await page.locator('#btn-add-certification').click();
+      const cert = page.locator('#cert-items-container .editor-card').last();
+      await cert.locator('.cert-name').fill('Cloud Associate');
+      await cert.locator('.cert-issuer').fill('Example Institute');
+      await cert.locator('.cert-date').fill('2025');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await previewText(page)).toContain('SMOKE CANDIDATE');
+      expect(await previewText(page)).toContain('Cloud Associate');
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await page.locator('#edit-name').inputValue()).toBe('Smoke Candidate');
+      expect(await page.locator('.cert-name').inputValue()).toBe('Cloud Associate');
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(draft.draftResume.work).toHaveLength(1);
+      expect(draft.draftResume.education).toHaveLength(1);
+      expect(draft.draftResume.skills).toHaveLength(1);
+      expect(draft.draftResume.projects).toHaveLength(1);
+      expect(draft.draftResume.certifications).toHaveLength(1);
+    } finally { await page.close(); }
+  }, 60000);
+
   it('collapses education cards and explains detailed-only academic projects', async () => {
     const page = await browser.newPage();
     try {

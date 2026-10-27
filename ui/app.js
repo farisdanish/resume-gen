@@ -33,6 +33,7 @@ import { PdfPreview } from './pdf-preview.js';
     work: {},      // index -> boolean
     education: {}, // stable education ID -> boolean
     projects: {},  // index -> boolean
+    certifications: {}, // index -> boolean
     references: {}, // index -> boolean
     headshot: true,
   };
@@ -556,6 +557,26 @@ import { PdfPreview } from './pdf-preview.js';
     }, 300);
   }
 
+  function removeIndexedEntry(kind, index) {
+    draftResume[kind].splice(index, 1);
+    const prior = visibility[kind] || {};
+    visibility[kind] = Object.fromEntries(draftResume[kind].map((_, next) =>
+      [next, prior[next < index ? next : next + 1] !== false]));
+    populateContentForm();
+    scheduleDebouncedPreview();
+  }
+
+  function moveIndexedEntry(kind, index, offset) {
+    const target = index + offset;
+    if (target < 0 || target >= draftResume[kind].length) return;
+    [draftResume[kind][index], draftResume[kind][target]] = [draftResume[kind][target], draftResume[kind][index]];
+    const included = visibility[kind]?.[index] !== false;
+    visibility[kind][index] = visibility[kind]?.[target] !== false;
+    visibility[kind][target] = included;
+    populateContentForm();
+    scheduleDebouncedPreview();
+  }
+
   // Build filtered resume according to visibility toggles
   function buildPayload() {
     if (!draftResume) return null;
@@ -585,6 +606,9 @@ import { PdfPreview } from './pdf-preview.js';
     // 4. Filter Projects items
     if (cloned.projects && Array.isArray(cloned.projects)) {
       cloned.projects = cloned.projects.filter((_, idx) => visibility.projects[idx] !== false);
+    }
+    if (Array.isArray(cloned.certifications)) {
+      cloned.certifications = cloned.certifications.filter((_, idx) => visibility.certifications?.[idx] !== false);
     }
 
     if (cloned.references?.mode === 'entries') {
@@ -633,6 +657,7 @@ import { PdfPreview } from './pdf-preview.js';
 
     // Education & Projects
     renderEduAndProjectsEditor();
+    renderCertificationsEditor();
     renderReferencesEditor();
 
     // Design & Theme controls
@@ -751,6 +776,11 @@ import { PdfPreview } from './pdf-preview.js';
 
       // Role & Company inputs
       body.innerHTML = `
+        <div class="edu-actions">
+          <button type="button" class="win-button win-button-sm btn-move-work-up">↑ Move Up</button>
+          <button type="button" class="win-button win-button-sm btn-move-work-down">↓ Move Down</button>
+          <button type="button" class="win-button win-button-sm btn-remove-work">× Remove Position</button>
+        </div>
         <div style="display: flex; gap: 4px;">
           <div style="flex: 1;">
             <label class="form-label" style="font-size: 10px;">Role:</label>
@@ -761,6 +791,8 @@ import { PdfPreview } from './pdf-preview.js';
             <input type="text" class="win-input input-work-company" data-idx="${roleIdx}" value="${escapeHtml(item.company || '')}" style="width: 100%;">
           </div>
         </div>
+        <label class="form-label">Location:</label>
+        <input type="text" class="win-input input-work-location" value="${escapeHtml(item.location || '')}">
         <div style="display: flex; gap: 4px;">
           <div style="flex: 1;">
             <label class="form-label" style="font-size: 10px;">Start:</label>
@@ -812,6 +844,15 @@ import { PdfPreview } from './pdf-preview.js';
         item.company = e.target.value;
         scheduleDebouncedPreview();
       });
+      body.querySelector('.input-work-location').addEventListener('input', (e) => {
+        item.location = e.target.value;
+        scheduleDebouncedPreview();
+      });
+      body.querySelector('.btn-remove-work').addEventListener('click', () => {
+        if (confirm('Remove this work position?')) removeIndexedEntry('work', roleIdx);
+      });
+      body.querySelector('.btn-move-work-up').addEventListener('click', () => moveIndexedEntry('work', roleIdx, -1));
+      body.querySelector('.btn-move-work-down').addEventListener('click', () => moveIndexedEntry('work', roleIdx, 1));
       body.querySelector('.input-work-start').addEventListener('input', (e) => {
         item.start = e.target.value;
         scheduleDebouncedPreview();
@@ -830,6 +871,14 @@ import { PdfPreview } from './pdf-preview.js';
       });
     });
   }
+
+  document.getElementById('btn-add-work')?.addEventListener('click', () => {
+    if (!draftResume) return;
+    draftResume.work.push({ role: '', company: '', location: '', start: '', end: null, highlights: [] });
+    renderWorkExperienceEditor();
+    workItemsContainer.lastElementChild.querySelector('.input-work-role').focus();
+    scheduleDebouncedPreview();
+  });
 
   function renderBulletInputs(container, highlights, roleIdx) {
     if (!container) return;
@@ -879,6 +928,9 @@ import { PdfPreview } from './pdf-preview.js';
           <span>${escapeHtml(cat.category || 'Skill Category')}</span>
         </div>
         <div class="editor-card-body">
+          <label class="form-label">Category name:</label>
+          <input type="text" class="win-input input-category-name" value="${escapeHtml(cat.category || '')}">
+          <button type="button" class="win-button win-button-sm btn-remove-category">× Delete Category</button>
           <div class="tags-container" id="tags-container-${catIdx}"></div>
           <div style="display: flex; gap: 4px; margin-top: 4px;">
             <input type="text" class="win-input input-new-skill" placeholder="Add skill (e.g. Docker)" style="flex: 1;">
@@ -894,6 +946,16 @@ import { PdfPreview } from './pdf-preview.js';
 
       const inputNewSkill = catBox.querySelector('.input-new-skill');
       const btnAddSkill = catBox.querySelector('.btn-add-skill');
+      catBox.querySelector('.input-category-name').addEventListener('input', (event) => {
+        cat.category = event.target.value;
+        scheduleDebouncedPreview();
+      });
+      catBox.querySelector('.btn-remove-category').addEventListener('click', () => {
+        if (!confirm('Delete this skill category and its tags?')) return;
+        draftResume.skills.splice(catIdx, 1);
+        renderSkillsEditor();
+        scheduleDebouncedPreview();
+      });
 
       const addAction = () => {
         const val = inputNewSkill.value.trim();
@@ -915,6 +977,14 @@ import { PdfPreview } from './pdf-preview.js';
       });
     });
   }
+
+  document.getElementById('btn-add-category')?.addEventListener('click', () => {
+    if (!draftResume) return;
+    draftResume.skills.push({ category: '', items: [] });
+    renderSkillsEditor();
+    skillsItemsContainer.lastElementChild.querySelector('.input-category-name').focus();
+    scheduleDebouncedPreview();
+  });
 
   function renderSkillTags(container, items, catIdx) {
     if (!container) return;
@@ -956,6 +1026,9 @@ import { PdfPreview } from './pdf-preview.js';
       item.subjects ||= [];
       item.subjects.forEach((subject, subjectIndex) => { subject.id ||= `${id}-subject-${subjectIndex + 1}`; });
     });
+    if (Array.isArray(resume.certifications)) {
+      resume.certifications = resume.certifications.map((item) => typeof item === 'string' ? { name: item } : item);
+    }
     return resume;
   }
 
@@ -1055,7 +1128,6 @@ import { PdfPreview } from './pdf-preview.js';
         const action = button.dataset.action;
         if (action === 'clear-grade') { delete edu.grade; renderEducationEditor(); scheduleDebouncedPreview(); return; }
         if (action === 'remove') {
-          if (draftResume.education.length === 1) { alert('At least one qualification is required.'); return; }
           if ((edu.institution || edu.degree || edu.grade || edu.subjects?.length) && !confirm('Remove this qualification?')) return;
           draftResume.education.splice(index, 1); delete visibility.education[edu.id]; openEducationCards.delete(edu.id);
         } else if (action === 'duplicate') {
@@ -1112,10 +1184,17 @@ import { PdfPreview } from './pdf-preview.js';
         const div = document.createElement('div');
         div.style.marginBottom = '4px';
         div.innerHTML = `
+          <div class="edu-actions">
+            <button type="button" class="win-button win-button-sm btn-move-project-up">↑ Move Up</button>
+            <button type="button" class="win-button win-button-sm btn-move-project-down">↓ Move Down</button>
+            <button type="button" class="win-button win-button-sm btn-remove-project">× Remove Project</button>
+          </div>
           <label class="win-checkbox-row">
             <input type="checkbox" class="chk-proj-include" data-idx="${projIdx}" ${isIncluded ? 'checked' : ''}>
             <span><b>${escapeHtml(proj.title || '')}</b></span>
           </label>
+          <label class="form-label" for="project-title-${projIdx}">Title:</label>
+          <input id="project-title-${projIdx}" class="win-input input-project-title" type="text" value="${escapeHtml(proj.title || '')}">
           <label class="form-label" for="project-description-${projIdx}">Description:</label>
           <textarea id="project-description-${projIdx}" class="win-textarea input-project-description" rows="3"
             aria-describedby="project-description-error-${projIdx}"></textarea>
@@ -1129,6 +1208,15 @@ import { PdfPreview } from './pdf-preview.js';
           </div>
         `;
         const stack = div.querySelector('.input-project-stack');
+        div.querySelector('.input-project-title').addEventListener('input', (event) => {
+          proj.title = event.target.value;
+          scheduleDebouncedPreview();
+        });
+        div.querySelector('.btn-remove-project').addEventListener('click', () => {
+          if (confirm('Remove this project?')) removeIndexedEntry('projects', projIdx);
+        });
+        div.querySelector('.btn-move-project-up').addEventListener('click', () => moveIndexedEntry('projects', projIdx, -1));
+        div.querySelector('.btn-move-project-down').addEventListener('click', () => moveIndexedEntry('projects', projIdx, 1));
         const link = div.querySelector('.input-project-link');
         stack.value = (proj.stack || []).join(', ');
         link.value = proj.link || '';
@@ -1171,6 +1259,59 @@ import { PdfPreview } from './pdf-preview.js';
       });
     }
   }
+
+  document.getElementById('btn-add-project')?.addEventListener('click', () => {
+    if (!draftResume) return;
+    draftResume.projects.push({ title: '', description: '', stack: [] });
+    renderEduAndProjectsEditor();
+    projItemsContainer.lastElementChild.querySelector('.input-project-title').focus();
+    scheduleDebouncedPreview();
+  });
+
+  function renderCertificationsEditor() {
+    const container = document.getElementById('cert-items-container');
+    if (!container || !draftResume) return;
+    container.innerHTML = '';
+    (draftResume.certifications || []).forEach((certificate, index) => {
+      const cert = typeof certificate === 'string' ? { name: certificate } : certificate;
+      if (cert !== certificate) draftResume.certifications[index] = cert;
+      const card = document.createElement('div');
+      card.className = 'editor-card';
+      card.innerHTML = `<div class="editor-card-body">
+        <label class="win-checkbox-row"><input type="checkbox" class="cert-include" ${visibility.certifications?.[index] !== false ? 'checked' : ''}> Include</label>
+        <label class="form-label">Name:</label><input type="text" class="win-input cert-name" value="${escapeHtml(cert.name || '')}">
+        <label class="form-label">Issuer:</label><input type="text" class="win-input cert-issuer" value="${escapeHtml(cert.issuer || '')}">
+        <label class="form-label">Date (YYYY or YYYY-MM):</label><input type="text" class="win-input cert-date" value="${escapeHtml(cert.date || '')}">
+        <button type="button" class="win-button win-button-sm cert-remove">× Remove Certification</button>
+      </div>`;
+      container.appendChild(card);
+      card.querySelector('.cert-include').addEventListener('change', (event) => {
+        visibility.certifications ||= {};
+        visibility.certifications[index] = event.target.checked;
+        scheduleDebouncedPreview();
+      });
+      for (const [selector, field] of [['.cert-name', 'name'], ['.cert-issuer', 'issuer'], ['.cert-date', 'date']]) {
+        card.querySelector(selector).addEventListener('input', (event) => {
+          const value = event.target.value.trim();
+          if (field === 'name') cert.name = event.target.value;
+          else if (value) cert[field] = value;
+          else delete cert[field];
+          scheduleDebouncedPreview();
+        });
+      }
+      card.querySelector('.cert-remove').addEventListener('click', () => {
+        if (confirm('Remove this certification?')) removeIndexedEntry('certifications', index);
+      });
+    });
+  }
+
+  document.getElementById('btn-add-certification')?.addEventListener('click', () => {
+    if (!draftResume) return;
+    draftResume.certifications.push({ name: '' });
+    renderCertificationsEditor();
+    document.getElementById('cert-items-container').lastElementChild.querySelector('.cert-name').focus();
+    scheduleDebouncedPreview();
+  });
 
   function populateHeadshotControls() {
     const headshot = draftResume?.basics?.headshot;
@@ -1550,7 +1691,7 @@ import { PdfPreview } from './pdf-preview.js';
   });
 
   // --- Network API Actions ---
-  async function extractData() {
+  async function extractData(restoreStored = false) {
     try {
       setStatus('Extracting resume DOM...');
       const sourceType = document.querySelector('input[name="source-type"]:checked')?.value || 'fixture';
@@ -1585,9 +1726,10 @@ import { PdfPreview } from './pdf-preview.js';
       pristineResume = result.data;
 
       // If no stored draft, initialize from pristine
-      const hasStored = loadStateFromStorage();
+      const hasStored = restoreStored === true && loadStateFromStorage();
       if (!hasStored || !draftResume) {
         draftResume = JSON.parse(JSON.stringify(pristineResume));
+        visibility = normalizedVisibility(null, draftResume);
       }
 
       log(`Extraction successful. Loaded ${draftResume.work?.length || 0} work items, ${draftResume.education?.length || 0} education items.`, 'success');
@@ -1779,6 +1921,7 @@ import { PdfPreview } from './pdf-preview.js';
         work: {},
         education: {},
         projects: {},
+        certifications: {},
         references: {},
         headshot: true,
       };
@@ -1798,6 +1941,27 @@ import { PdfPreview } from './pdf-preview.js';
       renderPreview();
       log('Reverted resume to pristine extracted state.', 'info');
     }
+  }
+
+  function startBlank() {
+    if (draftResume && pristineResume && JSON.stringify(draftResume) !== JSON.stringify(pristineResume)
+      && !confirm('Start a blank resume? This replaces your current edits. Download Save Profile first to keep a copy.')) return;
+    const blank = {
+      basics: { name: 'Your Name', title: 'Professional Title', summary: 'Write a short professional summary.',
+        contact: { email: 'you@example.com', location: 'Your Location' } },
+      work: [], education: [], skills: [], certifications: [], projects: [],
+    };
+    pristineResume = structuredClone(blank);
+    const profile = parseImportedProfile({
+      version: PROFILE_VERSION, draftResume: blank, visibility: {},
+      styleConfig: {}, sectionHeadings: {}, sectionOrder: [...DEFAULT_SECTION_ORDER],
+      pageTarget: 1, educationConfig: { ...DEFAULT_EDUCATION_CONFIG },
+    });
+    applyProfile(profile);
+    savedNamedSnapshot = '';
+    populateContentForm();
+    document.querySelector('[data-tab="tab-content"]')?.click();
+    scheduleDebouncedPreview();
   }
 
   function exportJson() {
@@ -1843,6 +2007,7 @@ import { PdfPreview } from './pdf-preview.js';
       work: normalizeMap(source.work, resume.work?.length || 0),
       education: Object.fromEntries((resume.education || []).map((item, index) => [item.id, source.education?.[item.id] ?? source.education?.[index] ?? true])),
       projects: normalizeMap(source.projects, resume.projects?.length || 0),
+      certifications: normalizeMap(source.certifications, resume.certifications?.length || 0),
       references: normalizeMap(source.references, resume.references?.mode === 'entries' ? resume.references.entries.length : 0),
       headshot: source.headshot !== false,
     };
@@ -1998,7 +2163,8 @@ import { PdfPreview } from './pdf-preview.js';
   }
 
   // --- Attach Action Event Listeners ---
-  btnExtract?.addEventListener('click', extractData);
+  btnExtract?.addEventListener('click', () => extractData());
+  document.getElementById('btn-start-blank')?.addEventListener('click', startBlank);
   btnResetDraft?.addEventListener('click', resetToPristine);
   btnExportJson?.addEventListener('click', exportJson);
   btnImportJsonTrigger?.addEventListener('click', () => inputImportJson?.click());
@@ -2029,5 +2195,5 @@ import { PdfPreview } from './pdf-preview.js';
   if (chkOfficeAssistant) chkOfficeAssistant.checked = localStorage.getItem(ASSISTANT_KEY) !== 'false';
   populateProfileLibrary();
   applyZoom();
-  extractData();
+  extractData(true);
 })();

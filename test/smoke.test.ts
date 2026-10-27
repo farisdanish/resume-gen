@@ -9,6 +9,10 @@ import { renderResume } from '../src/render';
 import { generatePdf } from '../src/pdf';
 import resumeFixture from '../fixtures/resume.json';
 import compatibility from '../fixtures/pdf-compatibility.json';
+import blankStarter from '../fixtures/templates/blank.json';
+import graduateStarter from '../fixtures/templates/fresh-graduate.json';
+import engineerStarter from '../fixtures/templates/mid-senior-engineer.json';
+import internStarter from '../fixtures/templates/student-intern.json';
 import { extractText } from 'unpdf';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +22,17 @@ const OUT_DIR = path.resolve(ROOT_DIR, 'out');
 const SCRATCH_DIR = path.resolve(ROOT_DIR, 'out/test-scratch');
 
 describe('Smoke Test Suite', () => {
+  test.each([
+    ['blank', blankStarter], ['fresh graduate', graduateStarter],
+    ['experienced engineer', engineerStarter], ['student intern', internStarter],
+  ])('%s starter exports an ATS-readable PDF within two pages', async (_label, starter) => {
+    const resume = ResumeSchema.parse(starter);
+    const result = await generatePdf({ html: renderResume(resume) });
+    expect(result.pageCount).toBeGreaterThanOrEqual(1);
+    expect(result.pageCount).toBeLessThanOrEqual(2);
+    const text = (await extractText(new Uint8Array(result.buffer))).text.join(' ');
+    expect(text.toLowerCase()).toContain(resume.basics.name.toLowerCase());
+  }, 60000);
   test('SPM text results remain readable in the PDF', async () => {
     const resume = ResumeSchema.parse({ ...resumeFixture, education: [{ ...resumeFixture.education[0],
       level: 'spm', degree: 'Sijil Pelajaran Malaysia (SPM)', grade: undefined,

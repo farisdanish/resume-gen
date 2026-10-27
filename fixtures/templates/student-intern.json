@@ -1,0 +1,45 @@
+{
+  "basics": {
+    "name": "Aisha Rahman",
+    "title": "Software Engineering Intern",
+    "summary": "Computer science student seeking an internship to apply web development and data skills.",
+    "contact": {
+      "email": "aisha.rahman@example.com",
+      "location": "Johor Bahru, Malaysia"
+    }
+  },
+  "work": [],
+  "education": [
+    {
+      "id": "edu-aisha-1",
+      "institution": "Example University Malaysia",
+      "degree": "BSc Computer Science",
+      "level": "bachelor",
+      "start": "2024",
+      "end": null
+    }
+  ],
+  "skills": [
+    {
+      "category": "Development",
+      "items": [
+        "Python",
+        "HTML",
+        "CSS",
+        "Git"
+      ]
+    }
+  ],
+  "certifications": [],
+  "projects": [
+    {
+      "title": "Study Planner",
+      "description": "Created a simple planner for coursework and deadlines.",
+      "stack": [
+        "Python",
+        "HTML",
+        "CSS"
+      ]
+    }
+  ]
+}

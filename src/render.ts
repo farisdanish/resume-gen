@@ -87,6 +87,7 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
   const displayResume = {
     ...resume,
     work: resume.work.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
+    certifications: resume.certifications.map((item) => ({ ...item, date: formatDisplayDate(item.date, styleConfig?.dateFormat) })),
     education: resume.education.map((item) => ({
       ...item,
       start: educationConfig.showDates ? formatDisplayDate(item.start, styleConfig?.dateFormat) : undefined,

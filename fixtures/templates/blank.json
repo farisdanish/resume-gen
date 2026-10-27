@@ -1,0 +1,16 @@
+{
+  "basics": {
+    "name": "Your Name",
+    "title": "Professional Title",
+    "summary": "Write a short professional summary.",
+    "contact": {
+      "email": "you@example.com",
+      "location": "Your Location"
+    }
+  },
+  "work": [],
+  "education": [],
+  "skills": [],
+  "certifications": [],
+  "projects": []
+}

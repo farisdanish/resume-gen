@@ -1,0 +1,53 @@
+{
+  "basics": {
+    "name": "Nadia Lee",
+    "title": "Graduate Software Engineer",
+    "summary": "Computer science graduate with internship and campus project experience in web applications.",
+    "contact": {
+      "email": "nadia.lee@example.com",
+      "location": "Kuala Lumpur, Malaysia"
+    }
+  },
+  "work": [
+    {
+      "role": "Software Engineering Intern",
+      "company": "Example Digital",
+      "start": "2025-06",
+      "end": "2025-08",
+      "highlights": [
+        "Built and tested a dashboard feature with the engineering team."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "edu-nadia-1",
+      "institution": "Example University Malaysia",
+      "degree": "BSc Computer Science",
+      "level": "bachelor",
+      "start": "2022",
+      "end": "2026"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Development",
+      "items": [
+        "JavaScript",
+        "Python",
+        "SQL"
+      ]
+    }
+  ],
+  "certifications": [],
+  "projects": [
+    {
+      "title": "Campus Event Planner",
+      "description": "Built a web app to organize student events and registrations.",
+      "stack": [
+        "JavaScript",
+        "SQL"
+      ]
+    }
+  ]
+}

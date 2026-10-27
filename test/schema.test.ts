@@ -10,6 +10,10 @@ import {
 } from '../src/schema';
 import { DEFAULT_SECTION_ORDER } from '../src/constants';
 import resumeFixture from '../fixtures/resume.json';
+import blankStarter from '../fixtures/templates/blank.json';
+import graduateStarter from '../fixtures/templates/fresh-graduate.json';
+import engineerStarter from '../fixtures/templates/mid-senior-engineer.json';
+import internStarter from '../fixtures/templates/student-intern.json';
 
 describe('Education customization', () => {
   test('accepts free-text SPM results independently of numeric CGPA', () => {
@@ -42,6 +46,29 @@ describe('Education customization', () => {
 
   test('rejects unsupported display modes', () => {
     expect(EducationDisplayConfigSchema.safeParse({ mode: 'verbose' }).success).toBe(false);
+  });
+});
+
+describe('Blank authoring and certification compatibility', () => {
+  test.each([
+    ['blank', blankStarter], ['fresh graduate', graduateStarter],
+    ['experienced engineer', engineerStarter], ['student intern', internStarter],
+  ])('%s starter is schema valid', (_name, starter) => {
+    expect(ResumeSchema.safeParse(starter).success).toBe(true);
+  });
+
+  test('accepts empty authored sections and normalizes old certification strings', () => {
+    const parsed = ResumeSchema.parse({ ...resumeFixture, work: [], education: [], skills: [], certifications: ['Cloud Associate'] });
+    expect(parsed.work).toEqual([]);
+    expect(parsed.education).toEqual([]);
+    expect(parsed.skills).toEqual([]);
+    expect(parsed.certifications).toEqual([{ name: 'Cloud Associate' }]);
+  });
+
+  test('keeps issuer and date independent and rejects an invalid date', () => {
+    const certification = { name: 'Cloud Associate', issuer: 'Example Institute', date: '2025-06' };
+    expect(ResumeSchema.parse({ ...resumeFixture, certifications: [certification] }).certifications).toEqual([certification]);
+    expect(ResumeSchema.safeParse({ ...resumeFixture, certifications: [{ ...certification, date: '06/2025' }] }).success).toBe(false);
   });
 });
 

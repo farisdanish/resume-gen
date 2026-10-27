@@ -85,6 +85,12 @@ export const SkillCategorySchema = z.object({
   items: z.array(z.string().min(1)).min(1),
 });
 
+export const CertificationSchema = z.object({
+  name: z.string().trim().min(1),
+  issuer: z.string().trim().min(1).optional(),
+  date: DatePointSchema.optional(),
+});
+
 export const ProjectSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
@@ -126,10 +132,14 @@ export const HeadshotSchema = z.object({
 });
 
 export function normalizeEducationInput(input: unknown): unknown {
-  if (!input || typeof input !== 'object' || !Array.isArray((input as any).education)) return input;
+  if (!input || typeof input !== 'object') return input;
   const resume = input as any;
+  const certifications = Array.isArray(resume.certifications)
+    ? resume.certifications.map((item: unknown) => typeof item === 'string' ? { name: item } : item)
+    : resume.certifications;
+  if (!Array.isArray(resume.education)) return { ...resume, certifications };
   const used = new Set<string>();
-  return { ...resume, education: resume.education.map((entry: any, index: number) => {
+  return { ...resume, certifications, education: resume.education.map((entry: any, index: number) => {
     if (!entry || typeof entry !== 'object') return entry;
     const seed = `${entry.institution || ''}|${entry.degree || ''}|${entry.start || ''}|${entry.end || ''}|${index}`;
     let hash = 2166136261;
@@ -151,10 +161,10 @@ export const ResumeSchema = z.preprocess(normalizeEducationInput, z.object({
     contact: ContactInfoSchema,
     headshot: HeadshotSchema.optional(),
   }),
-  work: z.array(WorkExperienceSchema).min(1),
-  education: z.array(EducationSchema).min(1).refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Education IDs must be unique'),
-  skills: z.array(SkillCategorySchema).min(1),
-  certifications: z.array(z.string()).default([]),
+  work: z.array(WorkExperienceSchema),
+  education: z.array(EducationSchema).refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Education IDs must be unique'),
+  skills: z.array(SkillCategorySchema),
+  certifications: z.array(CertificationSchema).default([]),
   projects: z.array(ProjectSchema).default([]),
   references: ReferencesConfigSchema.optional(),
 }));

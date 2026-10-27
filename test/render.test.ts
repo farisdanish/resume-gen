@@ -3,6 +3,14 @@ import { renderResume } from '../src/render';
 import resumeFixture from '../fixtures/resume.json';
 
 describe('Template & Render Engine', () => {
+  it('renders blank sections safely and structured certificate details', () => {
+    const blank = renderResume({ ...resumeFixture, work: [], education: [], skills: [], projects: [], certifications: [] });
+    expect(blank).not.toContain('class="section section-experience"');
+    expect(blank).not.toContain('class="section section-education"');
+    const html = renderResume({ ...resumeFixture, certifications: [{ name: 'Cloud Associate', issuer: 'Example Institute', date: '2025-06' }] },
+      { styleConfig: { dateFormat: 'month-name' } });
+    expect(html).toContain('Cloud Associate — Example Institute (Jun 2025)');
+  });
   it('renders SPM text results without a numeric CGPA or invented values', () => {
     const spm = { ...resumeFixture.education[0], degree: 'Sijil Pelajaran Malaysia (SPM)', level: 'spm',
       grade: { value: 3.5, scale: 4 }, spmResults: { overall: '5A2B1C1D', bahasaMelayu: 'A-' } };

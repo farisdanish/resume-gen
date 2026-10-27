@@ -1,0 +1,61 @@
+{
+  "basics": {
+    "name": "Daniel Tan",
+    "title": "Senior Software Engineer",
+    "summary": "Software engineer focused on dependable services, clear delivery, and team mentoring.",
+    "contact": {
+      "email": "daniel.tan@example.com",
+      "location": "Penang, Malaysia"
+    }
+  },
+  "work": [
+    {
+      "role": "Senior Software Engineer",
+      "company": "Example Systems",
+      "start": "2022-01",
+      "end": null,
+      "highlights": [
+        "Reduced batch processing time by 30% by redesigning scheduled jobs.",
+        "Mentored four engineers through design reviews and delivery."
+      ]
+    },
+    {
+      "role": "Software Engineer",
+      "company": "Sample Labs",
+      "start": "2018-03",
+      "end": "2021-12",
+      "highlights": [
+        "Built APIs and improved release checks for customer-facing services."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "edu-daniel-1",
+      "institution": "Example University",
+      "degree": "BEng Software Engineering",
+      "level": "bachelor",
+      "start": "2014",
+      "end": "2018"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Engineering",
+      "items": [
+        "TypeScript",
+        "Node.js",
+        "PostgreSQL",
+        "Docker"
+      ]
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Cloud Practitioner",
+      "issuer": "Example Certification Body",
+      "date": "2024"
+    }
+  ],
+  "projects": []
+}

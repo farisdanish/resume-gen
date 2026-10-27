@@ -113,7 +113,7 @@
     <section class="section section-certifications">
       <h2 class="section-heading">{{headings.CERTIFICATIONS}}</h2>
       <div class="certs-inline">
-        {{#each resume.certifications}}{{this}}{{#unless @last}} • {{/unless}}{{/each}}
+        {{#each resume.certifications}}{{this.name}}{{#if this.issuer}} — {{this.issuer}}{{/if}}{{#if this.date}} ({{this.date}}){{/if}}{{#unless @last}} • {{/unless}}{{/each}}
       </div>
     </section>
     {{/if}}
