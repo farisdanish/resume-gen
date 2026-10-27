@@ -339,8 +339,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .experience-item, .project-item, .education-item, .skill-category-row,
 .reference-item, .highlight-list li { break-inside: avoid; }
 .experience-item.allow-page-split, .project-item.allow-page-split,
-.highlight-list li.allow-page-split { break-inside: auto; }
-.education-item { break-inside: auto; }
+.education-item.allow-page-split, .highlight-list li.allow-page-split { break-inside: auto; }
 .summary-text, .highlight-list li, .project-desc, .certs-inline { orphans: 2; widows: 2; }
 .readable-layout .item-header,
 .readable-layout .education-item { flex-wrap: wrap; gap: 2pt 8pt; }

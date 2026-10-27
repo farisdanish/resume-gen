@@ -65,7 +65,7 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
         const usableHeight = 297 * 96 / 25.4 - paddingTop - paddingBottom - printMargins;
         // Avoid moving an entry taller than a page onto an otherwise empty next page.
         // Short entries remain intact; oversized entries may use the remaining space.
-        for (const item of document.querySelectorAll('.experience-item, .project-item, .highlight-list li')) {
+        for (const item of document.querySelectorAll('.experience-item, .project-item, .education-item, .highlight-list li')) {
           item.classList.toggle('allow-page-split', item.getBoundingClientRect().height > usableHeight);
         }
         return { contentHeight, usableHeight, fullnessPercent: contentHeight / usableHeight * 100 };

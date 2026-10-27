@@ -51,6 +51,23 @@ describe('Design application and measured budget', () => {
     for (const raw of Object.values(result.texts)) expect(raw.split(end).length - 1).toBe(1);
   }, 30000);
 
+  it('keeps a short education entry and its academic project on one page', async () => {
+    const data = { ...structuredClone(compatibility), education: [{ ...compatibility.education[0], degree: 'BOUNDARY DEGREE',
+      grade: { value: 3.58, scale: 4 },
+      academicProject: { title: 'BOUNDARY PROJECT', description: 'EDUCATION-END' } }] };
+    let html = renderResume(data, { sectionOrder: ['education'], styleConfig: { bodyFontSize: 11 },
+      educationConfig: { mode: 'detailed', showAcademicProject: true } });
+    html = html.replace('<section class="section section-education">',
+      '<div style="height:220mm"></div><section class="section section-education">');
+    const { buffer } = await generatePdf({ html });
+    const result = await inspectPdf(buffer);
+    const pages = result.textPages.map((page) => page.runs.map((run) => run.text).join(' '));
+    const index = pages.findIndex((text) => text.includes('BOUNDARY DEGREE'));
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(pages[index]).toContain('EDUCATION-END');
+    expect(pages[index]).toContain('EDUCATION');
+  }, 30000);
+
   // Catches legacy-sized continuation pages losing top/bottom margins.
   it.each([undefined, 11] as const)('section-continuation repeats print margins at body size %s', async (bodyFontSize) => {
     const data = { ...compatibility, work: Array.from({ length: 30 }, () => compatibility.work[0]) };
