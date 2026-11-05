@@ -178,4 +178,31 @@ describe('Template & Render Engine', () => {
     expect(html).toContain('Jordan Lee');
     expect(html).toContain('jordan.lee@example.com');
   });
+
+  it('renders education details with scannable structure and separate project lines', () => {
+    const resume = {
+      ...resumeFixture,
+      education: [{
+        ...resumeFixture.education[0],
+        achievements: ['Dean’s Honor List', 'First Class Distinction'],
+        activities: ['ACM Student Chapter', 'Open Source Club'],
+        academicProject: {
+          title: 'Distributed File Store',
+          description: 'A Raft-based distributed key-value storage engine implemented in Go.',
+        },
+      }],
+    };
+    const html = renderResume(resume, {
+      educationConfig: { mode: 'detailed', showAcademicProject: true, showAchievements: true, showActivities: true },
+    });
+    expect(html).toContain('class="edu-detail edu-achievement"');
+    expect(html).toContain('Dean’s Honor List');
+    expect(html).toContain('class="edu-detail edu-activities"');
+    expect(html).toContain('Activities: ACM Student Chapter; Open Source Club');
+    expect(html).toContain('class="edu-detail edu-project-block"');
+    expect(html).toContain('class="edu-project-title"');
+    expect(html).toContain('Academic Project: Distributed File Store');
+    expect(html).toContain('class="edu-project-desc"');
+    expect(html).toContain('A Raft-based distributed key-value storage engine implemented in Go.');
+  });
 });

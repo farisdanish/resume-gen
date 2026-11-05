@@ -229,6 +229,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .edu-title-group { min-width: 0; overflow-wrap: anywhere; }
 
 .edu-detail { font-size: var(--font-base-size); line-height: var(--line-height-base); margin: 1pt 0 0 8pt; break-inside: avoid; }
+.edu-achievement { display: flex; align-items: baseline; gap: 4pt; }
+.edu-achievement .edu-bullet { color: #4a5568; flex-shrink: 0; }
+.edu-achievement-text { flex-grow: 1; }
+.edu-activities { margin-top: 1.5pt; color: #2d3748; }
+.edu-project-block { margin-top: 2pt; break-inside: avoid; }
+.edu-project-title { font-weight: 600; color: #1a202c; }
+.edu-project-desc { margin-top: 1pt; padding-left: 6pt; color: #4a5568; }
 
 .edu-degree {
   font-size: var(--font-base-size);

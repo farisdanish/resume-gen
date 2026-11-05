@@ -83,9 +83,14 @@
         {{#if this.grade}}<div class="edu-detail">{{#if this.grade.label}}{{this.grade.label}}{{else}}CGPA{{/if}}: {{this.grade.value}} / {{this.grade.scale}}</div>{{/if}}
         {{#if this.spmResults.overall}}<div class="edu-detail">SPM Results: {{this.spmResults.overall}}</div>{{/if}}
         {{#if this.spmResults.bahasaMelayu}}<div class="edu-detail">Bahasa Melayu: {{this.spmResults.bahasaMelayu}}</div>{{/if}}
-        {{#each this.achievements}}<div class="edu-detail">• {{this}}</div>{{/each}}
-        {{#if this.activities.length}}<div class="edu-detail">Activities: {{#each this.activities}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</div>{{/if}}
-        {{#if this.academicProject}}<div class="edu-detail">Academic Project: {{this.academicProject.title}}{{#if this.academicProject.description}} — {{this.academicProject.description}}{{/if}}</div>{{/if}}
+        {{#each this.achievements}}<div class="edu-detail edu-achievement"><span class="edu-bullet" aria-hidden="true">•</span> <span class="edu-achievement-text">{{this}}</span></div>{{/each}}
+        {{#if this.activities.length}}<div class="edu-detail edu-activities">Activities: {{#each this.activities}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</div>{{/if}}
+        {{#if this.academicProject}}
+        <div class="edu-detail edu-project-block">
+          <div class="edu-project-title">Academic Project: {{this.academicProject.title}}</div>
+          {{#if this.academicProject.description}}<div class="edu-project-desc">{{this.academicProject.description}}</div>{{/if}}
+        </div>
+        {{/if}}
       </div>
       {{/each}}
     </section>
