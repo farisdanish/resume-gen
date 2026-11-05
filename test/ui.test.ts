@@ -875,4 +875,69 @@ describe('Editor preview and budget flow', () => {
       await page.close();
     }
   }, 30000);
+
+  it('opens New Resume dialog, loads an archetype, and renders preview (M2-3)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('#btn-open-new-dialog').click();
+      const dialog = page.locator('#modal-new-resume');
+      expect(await dialog.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+
+      await page.locator('#choice-grad').check();
+      await page.locator('#btn-create-new-resume').click();
+
+      expect(await dialog.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+
+      // If unsaved dialog appears due to leftover storage draft, confirm discard
+      const unsavedModal = page.locator('#modal-unsaved-draft');
+      if (await unsavedModal.evaluate((el: HTMLDialogElement) => el.open).catch(() => false)) {
+        await page.locator('#btn-confirm-discard').click();
+      }
+
+      await page.waitForFunction(() => (document.getElementById('edit-name') as HTMLInputElement)?.value === 'Nadia Lee');
+      expect(await page.locator('#edit-name').inputValue()).toBe('Nadia Lee');
+      expect(await page.locator('#edit-title').inputValue()).toBe('Graduate Software Engineer');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('shows unsaved draft dialog when attempting to overwrite modified resume (M2-3)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-content"]').click();
+      await page.locator('#edit-name').fill('Modified Candidate Name');
+      await page.locator('#edit-name').dispatchEvent('input');
+
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#btn-load-grad').click();
+
+      const unsavedModal = page.locator('#modal-unsaved-draft');
+      expect(await unsavedModal.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+
+      await page.locator('#btn-confirm-discard').click();
+      expect(await unsavedModal.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+
+      await page.waitForFunction(() => (document.getElementById('edit-name') as HTMLInputElement)?.value === 'Nadia Lee');
+      expect(await page.locator('#edit-name').inputValue()).toBe('Nadia Lee');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('downloads PDF formatted as [NAME]_[ROLE].pdf (M2-2)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.locator('#btn-download-pdf').click(),
+      ]);
+      expect(download.suggestedFilename()).toBe('ALEX_MORGAN_BACKEND_SOFTWARE_ENGINEER_LARAVEL_DATA_PIPELINES_APIS_PYTHON_INTEROP.pdf');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
 });

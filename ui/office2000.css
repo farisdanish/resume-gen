@@ -166,19 +166,22 @@ html, body {
   color: var(--win-highlight-text);
 }
 
-.help-menu { position: relative; }
-.help-menu-trigger {
+.help-menu, .file-menu { position: relative; }
+.help-menu-trigger, .file-menu-trigger {
   border: 0;
   background: transparent;
   color: inherit;
   font-family: inherit;
+  cursor: pointer;
 }
 .help-menu-trigger[aria-expanded="true"],
-.help-menu-trigger:focus-visible {
+.help-menu-trigger:focus-visible,
+.file-menu-trigger[aria-expanded="true"],
+.file-menu-trigger:focus-visible {
   background: var(--win-highlight-blue);
   color: var(--win-highlight-text);
 }
-.help-dropdown {
+.help-dropdown, .file-dropdown {
   position: absolute;
   top: 100%;
   left: 0;
@@ -187,7 +190,7 @@ html, body {
   padding: 3px;
   background: var(--win-gray);
 }
-.help-dropdown [role="menuitem"] {
+.help-dropdown [role="menuitem"], .file-dropdown [role="menuitem"] {
   display: block;
   width: 100%;
   padding: 5px 18px;
@@ -201,7 +204,9 @@ html, body {
   cursor: pointer;
 }
 .help-dropdown [role="menuitem"]:hover,
-.help-dropdown [role="menuitem"]:focus {
+.help-dropdown [role="menuitem"]:focus,
+.file-dropdown [role="menuitem"]:hover,
+.file-dropdown [role="menuitem"]:focus {
   outline: none;
   background: var(--win-highlight-blue);
   color: var(--win-highlight-text);

@@ -171,6 +171,58 @@ import { PdfPreview } from './pdf-preview.js';
   let previewRevision = 0;
   let previewController = null;
 
+  // File Menu
+  const fileTrigger = document.getElementById('menu-file');
+  const fileDropdown = document.getElementById('file-dropdown');
+  const fileItems = fileDropdown ? Array.from(fileDropdown.querySelectorAll('[role="menuitem"]')) : [];
+
+  function closeFileMenu(restoreFocus = false) {
+    if (!fileDropdown || !fileTrigger) return;
+    fileDropdown.hidden = true;
+    fileTrigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) fileTrigger.focus();
+  }
+
+  function openFileMenu(index = 0) {
+    if (!fileDropdown || !fileTrigger || !fileItems.length) return;
+    fileDropdown.hidden = false;
+    fileTrigger.setAttribute('aria-expanded', 'true');
+    fileItems[index].focus();
+  }
+
+  if (fileTrigger && fileDropdown) {
+    fileTrigger.addEventListener('click', () => {
+      if (fileDropdown.hidden) openFileMenu();
+      else closeFileMenu(true);
+    });
+    fileTrigger.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        openFileMenu(event.key === 'ArrowUp' ? fileItems.length - 1 : 0);
+      }
+    });
+    fileDropdown.addEventListener('keydown', (event) => {
+      const index = fileItems.indexOf(document.activeElement);
+      let next;
+      if (event.key === 'ArrowDown') next = (index + 1) % fileItems.length;
+      if (event.key === 'ArrowUp') next = (index - 1 + fileItems.length) % fileItems.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = fileItems.length - 1;
+      if (next !== undefined) {
+        event.preventDefault();
+        fileItems[next].focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeFileMenu(true);
+      } else if (event.key === 'Tab') {
+        closeFileMenu(true);
+      }
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!fileTrigger.parentElement?.contains(event.target)) closeFileMenu();
+    });
+  }
+
   // Help is a local menu; external links never include draft content.
   const helpTrigger = document.getElementById('menu-help');
   const helpDropdown = document.getElementById('help-dropdown');
@@ -225,7 +277,7 @@ import { PdfPreview } from './pdf-preview.js';
     closeHelpMenu(true);
     if (item.dataset.helpDialog) document.getElementById(item.dataset.helpDialog).showModal();
   }));
-  document.querySelectorAll('.help-dialog').forEach((dialog) => {
+  document.querySelectorAll('#help-topics, #help-about').forEach((dialog) => {
     dialog.querySelectorAll('[data-close-help]').forEach((button) => {
       button.addEventListener('click', () => dialog.close());
     });
@@ -1815,6 +1867,13 @@ import { PdfPreview } from './pdf-preview.js';
 
       const result = await res.json();
       if (revision !== previewRevision) return;
+      if (res.status === 429 || res.status === 503) {
+        showServerBusy(result.retryAfter || 5, () => renderPreview());
+        setBudgetUnavailable('Server busy — preview throttled');
+        log(`Server busy: ${result.error || 'PDF queue at capacity'}`, 'warn');
+        setStatus('Server busy', 'Busy');
+        return;
+      }
       if (!res.ok || !result.success) {
         setBudgetUnavailable('Budget unavailable — previous preview is out of date');
         log(`Rendering failed: ${result.error}`, 'error');
@@ -1874,6 +1933,14 @@ import { PdfPreview } from './pdf-preview.js';
         }),
       });
 
+      if (res.status === 429 || res.status === 503) {
+        const errorJson = await res.json().catch(() => ({}));
+        showServerBusy(errorJson.retryAfter || 5, () => exportPdf());
+        log(`Server busy: ${errorJson.error || 'PDF queue at capacity'}`, 'warn');
+        setStatus('Server busy', 'Busy');
+        return;
+      }
+
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
         log(`PDF generation failed: ${errorJson.error || res.statusText}`, 'error');
@@ -1894,7 +1961,7 @@ import { PdfPreview } from './pdf-preview.js';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `resume-${payload.basics?.name?.toLowerCase().replace(/\s+/g, '-') || 'candidate'}.pdf`;
+      a.download = formatExportFilename(payload);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1906,6 +1973,21 @@ import { PdfPreview } from './pdf-preview.js';
       log(`Export PDF network error: ${err.message}`, 'error');
       setStatus('Export failed', 'Error');
     }
+  }
+
+  function formatExportFilename(resume) {
+    const name = String(resume?.basics?.name || 'RESUME')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const role = String(resume?.basics?.title || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const base = [name, role].filter(Boolean).join('_') || 'RESUME';
+    return `${base}.pdf`;
   }
 
   function resetToPristine() {
@@ -1943,25 +2025,337 @@ import { PdfPreview } from './pdf-preview.js';
     }
   }
 
-  function startBlank() {
-    if (draftResume && pristineResume && JSON.stringify(draftResume) !== JSON.stringify(pristineResume)
-      && !confirm('Start a blank resume? This replaces your current edits. Download Save Profile first to keep a copy.')) return;
-    const blank = {
-      basics: { name: 'Your Name', title: 'Professional Title', summary: 'Write a short professional summary.',
-        contact: { email: 'you@example.com', location: 'Your Location' } },
-      work: [], education: [], skills: [], certifications: [], projects: [],
-    };
-    pristineResume = structuredClone(blank);
-    const profile = parseImportedProfile({
-      version: PROFILE_VERSION, draftResume: blank, visibility: {},
-      styleConfig: {}, sectionHeadings: {}, sectionOrder: [...DEFAULT_SECTION_ORDER],
-      pageTarget: 1, educationConfig: { ...DEFAULT_EDUCATION_CONFIG },
+  let pendingDirtyAction = null;
+
+  function isDraftDirty() {
+    if (!draftResume) return false;
+    if (savedNamedSnapshot !== null) {
+      return profileFingerprint(currentProfileBundle()) !== savedNamedSnapshot;
+    }
+    if (pristineResume) {
+      return JSON.stringify(draftResume) !== JSON.stringify(pristineResume);
+    }
+    return false;
+  }
+
+  function executeWithDirtyCheck(action) {
+    if (!isDraftDirty()) {
+      action();
+      return;
+    }
+    pendingDirtyAction = action;
+    const dialog = document.getElementById('modal-unsaved-draft');
+    if (dialog && typeof dialog.showModal === 'function') {
+      if (!dialog.open) dialog.showModal();
+    } else {
+      if (confirm('Discard your unsaved changes? Loading another template will replace these changes.')) {
+        action();
+      }
+    }
+  }
+
+  const STARTER_FIXTURES = {
+    blank: {
+      basics: {
+        name: 'Your Name',
+        title: 'Professional Title',
+        summary: 'Write a short professional summary.',
+        contact: { email: 'you@example.com', location: 'Your Location' }
+      },
+      work: [],
+      education: [],
+      skills: [],
+      certifications: [],
+      projects: []
+    },
+    'fresh-graduate': {
+      basics: {
+        name: 'Nadia Lee',
+        title: 'Graduate Software Engineer',
+        summary: 'Computer science graduate with internship and campus project experience in web applications.',
+        contact: { email: 'nadia.lee@example.com', location: 'Kuala Lumpur, Malaysia' }
+      },
+      work: [
+        {
+          role: 'Software Engineering Intern',
+          company: 'Example Digital',
+          start: '2025-06',
+          end: '2025-08',
+          highlights: ['Built and tested a dashboard feature with the engineering team.']
+        }
+      ],
+      education: [
+        {
+          id: 'edu-nadia-1',
+          institution: 'Example University Malaysia',
+          degree: 'BSc Computer Science',
+          level: 'bachelor',
+          start: '2022',
+          end: '2026'
+        }
+      ],
+      skills: [{ category: 'Development', items: ['JavaScript', 'Python', 'SQL'] }],
+      certifications: [],
+      projects: [
+        {
+          title: 'Campus Event Planner',
+          description: 'Built a web app to organize student events and registrations.',
+          stack: ['JavaScript', 'SQL']
+        }
+      ]
+    },
+    'mid-senior-engineer': {
+      basics: {
+        name: 'Daniel Tan',
+        title: 'Senior Software Engineer',
+        summary: 'Software engineer focused on dependable services, clear delivery, and team mentoring.',
+        contact: { email: 'daniel.tan@example.com', location: 'Penang, Malaysia' }
+      },
+      work: [
+        {
+          role: 'Senior Software Engineer',
+          company: 'Example Systems',
+          start: '2022-01',
+          end: null,
+          highlights: [
+            'Reduced batch processing time by 30% by redesigning scheduled jobs.',
+            'Mentored four engineers through design reviews and delivery.'
+          ]
+        },
+        {
+          role: 'Software Engineer',
+          company: 'Sample Labs',
+          start: '2018-03',
+          end: '2021-12',
+          highlights: ['Built APIs and improved release checks for customer-facing services.']
+        }
+      ],
+      education: [
+        {
+          id: 'edu-daniel-1',
+          institution: 'Example University',
+          degree: 'BEng Software Engineering',
+          level: 'bachelor',
+          start: '2014',
+          end: '2018'
+        }
+      ],
+      skills: [{ category: 'Engineering', items: ['TypeScript', 'Node.js', 'PostgreSQL', 'Docker'] }],
+      certifications: [],
+      projects: []
+    },
+    'student-intern': {
+      basics: {
+        name: 'Aisha Rahman',
+        title: 'Software Engineering Intern',
+        summary: 'Computer science student seeking an internship to apply web development and data skills.',
+        contact: { email: 'aisha.rahman@example.com', location: 'Johor Bahru, Malaysia' }
+      },
+      work: [],
+      education: [
+        {
+          id: 'edu-aisha-1',
+          institution: 'Example University Malaysia',
+          degree: 'BSc Computer Science',
+          level: 'bachelor',
+          start: '2024',
+          end: null
+        }
+      ],
+      skills: [{ category: 'Development', items: ['Python', 'HTML', 'CSS', 'Git'] }],
+      certifications: [],
+      projects: [
+        {
+          title: 'Study Planner',
+          description: 'Created a simple planner for coursework and deadlines.',
+          stack: ['Python', 'HTML', 'CSS']
+        }
+      ]
+    },
+    sample: {
+      basics: {
+        name: 'Alex Morgan',
+        title: 'Senior Full-Stack Engineer',
+        summary: 'Experienced engineer specializing in reliable distributed systems, accessible product experiences, and efficient delivery workflows.',
+        contact: {
+          email: 'alex.morgan@example.com',
+          phone: '+1-555-0100',
+          location: 'Seattle, WA',
+          github: 'https://github.com/alexmorgan-example',
+          linkedin: 'https://linkedin.com/in/alexmorgan-example',
+          website: 'https://alexmorgan.example'
+        }
+      },
+      work: [
+        {
+          role: 'Senior Software Engineer',
+          company: 'Acme Systems',
+          location: 'Seattle, WA',
+          start: '2024-03',
+          end: null,
+          highlights: [
+            'Architected scalable microservices delivering efficient offline workflow execution and high availability.',
+            'Engineered configuration pipelines supporting defined traffic profile requirements.'
+          ]
+        },
+        {
+          role: 'Software Engineer',
+          company: 'Northstar Labs',
+          location: 'Remote',
+          start: '2021-06',
+          end: '2024-02',
+          highlights: [
+            'Delivered full-stack UI workflows with sub-second page rendering and responsive styling.',
+            'Automated end-to-end integration test runners and cross-browser regression suites.'
+          ]
+        }
+      ],
+      education: [
+        {
+          id: 'edu-alex-1',
+          institution: 'University of Washington',
+          degree: 'B.S. in Computer Science',
+          level: 'bachelor',
+          field: 'Computer Science',
+          start: '2017-09',
+          end: '2021-06',
+          gpa: '3.85 / 4.0',
+          honors: ['Magna Cum Laude', 'Dean\'s List (All Quarters)'],
+          relevantCoursework: ['Distributed Systems', 'Data Structures & Algorithms', 'Database Systems', 'Cloud Computing'],
+          activities: ['ACM Student Chapter Officer', 'Peer Tutor in Algorithms']
+        }
+      ],
+      skills: [
+        { category: 'Languages', items: ['TypeScript', 'JavaScript', 'Python', 'Go', 'SQL'] },
+        { category: 'Frameworks & Tools', items: ['React', 'Node.js', 'Docker', 'Playwright', 'PostgreSQL', 'Tailwind CSS'] },
+        { category: 'Systems & Architecture', items: ['Distributed Systems', 'CI/CD Pipelines', 'REST APIs', 'Microservices', 'Performance Profiling'] }
+      ],
+      certifications: [
+        { name: 'AWS Certified Solutions Architect – Associate', issuer: 'Amazon Web Services', date: '2023-04' }
+      ],
+      projects: [
+        {
+          title: 'Real-time Workflow Engine',
+          role: 'Lead Developer',
+          start: '2023-01',
+          end: '2023-08',
+          description: 'A distributed workflow orchestration engine with deterministic execution guarantees and low latency.',
+          stack: ['Go', 'gRPC', 'PostgreSQL', 'Docker'],
+          highlights: ['Handles 10k+ transitions per minute with zero message loss.', 'Includes web-based execution graph inspection console.']
+        }
+      ]
+    }
+  };
+
+  async function loadStarterArchetype(name) {
+    executeWithDirtyCheck(async () => {
+      try {
+        setStatus(`Loading ${name} archetype...`);
+        let starterData = STARTER_FIXTURES[name];
+        try {
+          const res = await fetch(getApiUrl(`/api/starters/${name}`));
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) {
+              starterData = json.data;
+            }
+          }
+        } catch {
+          // Keep inlined fallback
+        }
+        if (!starterData) {
+          log(`Starter archetype "${name}" not found.`, 'error');
+          setStatus('Archetype not found', 'Error');
+          return;
+        }
+
+        openEducationCards.clear();
+        pristineResume = structuredClone(starterData);
+        const isAcademic = name === 'fresh-graduate' || name === 'student-intern';
+        const profile = parseImportedProfile({
+          version: PROFILE_VERSION,
+          draftResume: starterData,
+          visibility: {},
+          styleConfig: {},
+          sectionHeadings: {},
+          sectionOrder: isAcademic
+            ? ['summary', 'education', 'skills', 'projects', 'experience', 'certifications', 'references']
+            : [...DEFAULT_SECTION_ORDER],
+          pageTarget: 1,
+          educationConfig: { ...DEFAULT_EDUCATION_CONFIG },
+        });
+        applyProfile(profile);
+        savedNamedSnapshot = profileFingerprint(currentProfileBundle());
+        saveStateToStorage();
+        populateContentForm();
+        document.querySelector('[data-tab="tab-content"]')?.click();
+        await renderPreview();
+        log(`Loaded "${name}" archetype.`, 'success');
+        setStatus('Document ready', 'Ready');
+      } catch (err) {
+        log(`Failed to load starter archetype: ${err.message}`, 'error');
+        setStatus('Error loading archetype', 'Error');
+      }
     });
-    applyProfile(profile);
-    savedNamedSnapshot = '';
-    populateContentForm();
-    document.querySelector('[data-tab="tab-content"]')?.click();
-    scheduleDebouncedPreview();
+  }
+
+  function openNewResumeDialog() {
+    const dialog = document.getElementById('modal-new-resume');
+    if (dialog && typeof dialog.showModal === 'function') {
+      if (!dialog.open) dialog.showModal();
+    }
+  }
+
+  let serverBusyTimer = null;
+  function showServerBusy(retrySeconds = 5, retryFn = null) {
+    const dialog = document.getElementById('modal-server-busy');
+    if (!dialog) return;
+    const timerSpan = document.getElementById('busy-timer-seconds');
+    const progressFill = document.getElementById('busy-progress-fill');
+    const retryBtn = document.getElementById('btn-retry-busy');
+
+    if (serverBusyTimer) {
+      clearInterval(serverBusyTimer);
+      serverBusyTimer = null;
+    }
+
+    let remaining = Math.max(1, Number(retrySeconds) || 5);
+    const total = remaining;
+
+    if (timerSpan) timerSpan.textContent = String(remaining);
+    if (progressFill) progressFill.style.width = '100%';
+    if (retryBtn) retryBtn.disabled = true;
+
+    if (retryBtn) {
+      retryBtn.onclick = () => {
+        if (serverBusyTimer) clearInterval(serverBusyTimer);
+        dialog.close();
+        if (typeof retryFn === 'function') retryFn();
+      };
+    }
+
+    dialog.querySelectorAll('[data-close-server-busy]').forEach((btn) => {
+      btn.onclick = () => {
+        if (serverBusyTimer) clearInterval(serverBusyTimer);
+        dialog.close();
+      };
+    });
+
+    if (typeof dialog.showModal === 'function' && !dialog.open) {
+      dialog.showModal();
+    }
+
+    serverBusyTimer = setInterval(() => {
+      remaining -= 1;
+      if (timerSpan) timerSpan.textContent = String(Math.max(0, remaining));
+      if (progressFill) progressFill.style.width = `${Math.max(0, (remaining / total) * 100)}%`;
+
+      if (remaining <= 0) {
+        clearInterval(serverBusyTimer);
+        serverBusyTimer = null;
+        if (retryBtn) retryBtn.disabled = false;
+      }
+    }, 1000);
   }
 
   function exportJson() {
@@ -2164,7 +2558,10 @@ import { PdfPreview } from './pdf-preview.js';
 
   // --- Attach Action Event Listeners ---
   btnExtract?.addEventListener('click', () => extractData());
-  document.getElementById('btn-start-blank')?.addEventListener('click', startBlank);
+  document.getElementById('btn-start-blank')?.addEventListener('click', () => loadStarterArchetype('blank'));
+  document.getElementById('btn-open-new-dialog')?.addEventListener('click', openNewResumeDialog);
+  document.getElementById('btn-load-grad')?.addEventListener('click', () => loadStarterArchetype('fresh-graduate'));
+  document.getElementById('btn-load-senior')?.addEventListener('click', () => loadStarterArchetype('mid-senior-engineer'));
   btnResetDraft?.addEventListener('click', resetToPristine);
   btnExportJson?.addEventListener('click', exportJson);
   btnImportJsonTrigger?.addEventListener('click', () => inputImportJson?.click());
@@ -2186,6 +2583,60 @@ import { PdfPreview } from './pdf-preview.js';
   tbPrint?.addEventListener('click', exportPdf);
   tbPreview?.addEventListener('click', renderPreview);
   tbSave?.addEventListener('click', exportJson);
+  document.getElementById('tb-new')?.addEventListener('click', openNewResumeDialog);
+
+  // File Menu Actions
+  document.getElementById('menu-file-new')?.addEventListener('click', () => {
+    closeFileMenu(true);
+    openNewResumeDialog();
+  });
+  document.getElementById('menu-file-export-pdf')?.addEventListener('click', () => {
+    closeFileMenu(true);
+    exportPdf();
+  });
+  document.getElementById('menu-file-export-json')?.addEventListener('click', () => {
+    closeFileMenu(true);
+    exportJson();
+  });
+  document.getElementById('menu-file-import-json')?.addEventListener('click', () => {
+    closeFileMenu(true);
+    inputImportJson?.click();
+  });
+
+  // Dialog Controls
+  document.getElementById('btn-create-new-resume')?.addEventListener('click', () => {
+    const choice = document.querySelector('input[name="new-resume-choice"]:checked')?.value || 'blank';
+    document.getElementById('modal-new-resume')?.close();
+    loadStarterArchetype(choice);
+  });
+  document.querySelectorAll('[data-close-new-resume]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.getElementById('modal-new-resume')?.close();
+    });
+  });
+
+  const unsavedModal = document.getElementById('modal-unsaved-draft');
+  document.getElementById('btn-confirm-discard')?.addEventListener('click', () => {
+    unsavedModal?.close();
+    if (typeof pendingDirtyAction === 'function') {
+      const act = pendingDirtyAction;
+      pendingDirtyAction = null;
+      act();
+    }
+  });
+  unsavedModal?.querySelectorAll('[data-close-unsaved]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      pendingDirtyAction = null;
+      unsavedModal.close();
+    });
+  });
+  unsavedModal?.addEventListener('cancel', () => {
+    pendingDirtyAction = null;
+  });
+
+  document.getElementById('modal-server-busy')?.addEventListener('cancel', () => {
+    if (serverBusyTimer) clearInterval(serverBusyTimer);
+  });
 
   // Initial startup
   const statusHost = document.getElementById('status-host');

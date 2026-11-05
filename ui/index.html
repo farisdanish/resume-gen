@@ -24,7 +24,17 @@
 
     <!-- 2. Menubar -->
     <nav class="win-menubar">
-      <div class="menu-item" id="menu-file"><u>F</u>ile</div>
+      <div class="file-menu">
+        <button type="button" class="menu-item file-menu-trigger" id="menu-file"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="file-dropdown"><u>F</u>ile</button>
+        <div class="file-dropdown bevel-outset" id="file-dropdown" role="menu" aria-label="File" hidden>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-file-new">New Resume…</button>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-file-export-pdf">Export PDF</button>
+          <div class="help-menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-file-export-json">Save Profile JSON…</button>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-file-import-json">Load Profile JSON…</button>
+        </div>
+      </div>
       <div class="menu-item" id="menu-edit"><u>E</u>dit</div>
       <div class="menu-item" id="menu-view"><u>V</u>iew</div>
       <div class="menu-item" id="menu-insert"><u>I</u>nsert</div>
@@ -133,7 +143,16 @@
           <div id="tab-source" class="tab-pane active">
             <!-- Data Source Section -->
             <fieldset class="win-fieldset">
-              <legend class="win-legend">1. Extraction Source</legend>
+              <legend class="win-legend">1. Resume Origin & Archetype</legend>
+              <div class="form-group" style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px;">
+                <button type="button" class="win-button win-button-primary btn-block" id="btn-open-new-dialog">📄 New Resume / Starter…</button>
+                <div style="display: flex; gap: 4px;">
+                  <button type="button" class="win-button btn-block" id="btn-start-blank" title="Start from an empty blank canvas">Start Blank</button>
+                  <button type="button" class="win-button btn-block" id="btn-load-grad" title="Load Fresh Graduate starter archetype">Fresh Grad</button>
+                  <button type="button" class="win-button btn-block" id="btn-load-senior" title="Load Experienced Engineer archetype">Mid/Senior</button>
+                </div>
+              </div>
+              <div style="border-top: 1px solid var(--win-dark-gray); border-bottom: 1px solid var(--win-white); margin: 6px 0;"></div>
               <div class="radio-group">
                 <label class="radio-label">
                   <input type="radio" name="source-type" value="fixture" checked id="src-fixture">
@@ -149,10 +168,9 @@
                 <input type="text" id="input-live-url" class="win-input" style="width: 100%;" placeholder="https://farisantoni.com" value="https://farisantoni.com">
               </div>
               <div class="form-group" style="margin-top: 8px;">
-                <button class="win-button win-button-primary btn-block" id="btn-extract">
+                <button class="win-button btn-block" id="btn-extract">
                   <span>⚡ Extract Resume DOM</span>
                 </button>
-                <button type="button" class="win-button btn-block" id="btn-start-blank">📄 Start Blank</button>
               </div>
             </fieldset>
 
@@ -615,6 +633,86 @@
       <p><a href="https://github.com/farisdanish/resume-gen" target="_blank" rel="noopener noreferrer">View the project on GitHub</a></p>
     </div>
     <div class="help-dialog-actions"><button type="button" class="win-button" data-close-help autofocus>OK</button></div>
+  </dialog>
+
+  <!-- New Resume Document Dialog -->
+  <dialog id="modal-new-resume" class="help-dialog bevel-outset" aria-labelledby="new-resume-title">
+    <div class="win-titlebar">
+      <h2 id="new-resume-title">New Resume Document</h2>
+      <button type="button" class="win-btn-control" data-close-new-resume aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <p style="margin-bottom: 8px;"><b>Choose a starting point for your résumé:</b></p>
+      <div class="radio-group" style="display: flex; flex-direction: column; gap: 8px;">
+        <label class="radio-label">
+          <input type="radio" name="new-resume-choice" value="blank" checked id="choice-blank">
+          <span><b>Start Blank</b> — Clean empty skeleton</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="new-resume-choice" value="fresh-graduate" id="choice-grad">
+          <span><b>Fresh Graduate Archetype</b> — Campus projects & internships</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="new-resume-choice" value="mid-senior-engineer" id="choice-senior">
+          <span><b>Experienced Engineer Archetype</b> — Metrics & tech stack</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="new-resume-choice" value="student-intern" id="choice-student">
+          <span><b>Student / Intern Archetype</b> — Coursework & honors</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="new-resume-choice" value="sample" id="choice-sample">
+          <span><b>Demo Sample Profile</b> — Alex Morgan standard fixture</span>
+        </label>
+      </div>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button type="button" class="win-button win-button-primary" id="btn-create-new-resume">Create</button>
+      <button type="button" class="win-button" data-close-new-resume>Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Unsaved Changes Confirmation Dialog -->
+  <dialog id="modal-unsaved-draft" class="help-dialog bevel-outset" aria-labelledby="unsaved-draft-title">
+    <div class="win-titlebar">
+      <h2 id="unsaved-draft-title">Microsoft Resume 2000</h2>
+      <button type="button" class="win-btn-control" data-close-unsaved aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <p style="margin: 4px 0 8px 0; font-weight: bold;">Do you want to discard your unsaved changes?</p>
+      <p style="font-size: 11px; color: #444; margin-bottom: 6px;">
+        You have modified your current draft. Loading another template will replace these changes.
+      </p>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button type="button" class="win-button win-button-primary" id="btn-confirm-discard">Discard & Proceed</button>
+      <button type="button" class="win-button" data-close-unsaved>Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Server Busy Retro Dialog -->
+  <dialog id="modal-server-busy" class="help-dialog bevel-outset" aria-labelledby="server-busy-title">
+    <div class="win-titlebar">
+      <h2 id="server-busy-title">Microsoft Resume 2000 - Server Busy</h2>
+      <button type="button" class="win-btn-control" data-close-server-busy aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <div style="display: flex; gap: 10px; align-items: flex-start;">
+        <span style="font-size: 24px;" aria-hidden="true">⏳</span>
+        <div>
+          <p style="font-weight: bold; margin-bottom: 4px;">Server Busy</p>
+          <p id="busy-message" style="margin-bottom: 8px; font-size: 11px;">The PDF generation server is currently processing requests for other users. Please wait a moment.</p>
+          <div class="progress-bar-container bevel-inset" style="width: 100%; height: 16px; background: #fff; position: relative; overflow: hidden; margin-bottom: 4px;">
+            <div id="busy-progress-fill" style="width: 100%; height: 100%; background: #0a246a; transition: width 1s linear;"></div>
+          </div>
+          <p id="busy-countdown-text" style="font-size: 11px; color: #444;">Retry available in <span id="busy-timer-seconds">5</span> seconds...</p>
+        </div>
+      </div>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button type="button" class="win-button win-button-primary" id="btn-retry-busy" disabled>Retry Now</button>
+      <button type="button" class="win-button" data-close-server-busy>Dismiss</button>
+    </div>
   </dialog>
 
   <script type="module" src="/app.js"></script>
