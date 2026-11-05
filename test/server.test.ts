@@ -313,4 +313,58 @@ describe('Server & Loopback Security Test', () => {
     expect(renderer.headers.get('content-type')).toContain('javascript');
   });
 
+  test('POST /api/generate-pdf: Rejects arbitrary HTML bypass (Finding A)', async () => {
+    const res = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: '<h1>Malicious injected raw HTML</h1>' }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('Resume JSON payload required');
+  });
+
+  test('POST /api/generate-pdf: Enforces 1MB request body limit (Finding C)', async () => {
+    const hugePayload = {
+      resume: {
+        ...resumeFixture,
+        basics: {
+          ...resumeFixture.basics,
+          summary: 'A'.repeat(1024 * 1024 + 500),
+        },
+      },
+    };
+    const res = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(hugePayload),
+    });
+    expect(res.status).toBe(413);
+  });
+
+  test('POST /api/generate-pdf: Sets Content-Disposition with formatPdfFilename (M2-2)', async () => {
+    const res = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: resumeFixture }),
+    });
+    expect(res.status).toBe(200);
+    const disposition = res.headers.get('content-disposition');
+    expect(disposition).toContain('ALEX_MORGAN_SENIOR_FULL_STACK_ENGINEER.pdf');
+  });
+
+  test('GET /api/starters/:name: Serves starter templates and rejects invalid names (M2-3)', async () => {
+    for (const starter of ['blank', 'fresh-graduate', 'mid-senior-engineer', 'student-intern', 'sample']) {
+      const res = await fetch(`${BASE_URL}/api/starters/${starter}`);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.basics).toBeDefined();
+    }
+
+    const invalid = await fetch(`${BASE_URL}/api/starters/nonexistent-archetype`);
+    expect(invalid.status).toBe(404);
+  });
+
 });
