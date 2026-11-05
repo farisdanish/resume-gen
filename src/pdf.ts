@@ -33,6 +33,17 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
       if (expired) throw new Error('PDF layout measurement timed out');
       const page = await browser.newPage();
       await page.emulateMedia({ media: 'print' });
+
+      // Network isolation: abort all network egress from the PDF worker.
+      // All fonts and images are Base64-inlined; zero network requests are needed.
+      await page.route('**/*', (route) => {
+        const url = route.request().url();
+        if (url.startsWith('data:')) {
+          return route.continue();
+        }
+        return route.abort('blockedbyclient');
+      });
+
       await page.setContent(html, { waitUntil: 'load' });
 
       // Eliminate font loading races

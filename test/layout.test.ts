@@ -302,17 +302,35 @@ describe('Design application and measured budget', () => {
     expect(expanded.layout.fullnessPercent).toBeGreaterThan(original.layout.fullnessPercent);
   }, 30000);
 
-  it('bounds browser work when an image never finishes loading', async () => {
-    const imageServer = createServer(() => { /* Deliberately keep the image response open. */ });
+  it('aborts external network egress immediately (SSRF defense)', async () => {
+    let requestReceived = false;
+    const imageServer = createServer((_req, res) => {
+      requestReceived = true;
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end();
+    });
     await new Promise<void>((resolve) => imageServer.listen(0, '127.0.0.1', resolve));
     const port = (imageServer.address() as { port: number }).port;
     try {
-      await expect(generatePdf({ html: `<img src="http://127.0.0.1:${port}/stalled.png">` }))
-        .rejects.toThrow('timed out');
+      const result = await generatePdf({ html: `<img src="http://127.0.0.1:${port}/test.png">` });
+      expect(result.pageCount).toBe(1);
+      expect(requestReceived).toBe(false);
     } finally {
       imageServer.closeAllConnections();
       await new Promise<void>((resolve) => imageServer.close(() => resolve()));
     }
+  });
+
+  it('bounds browser work when layout measurement stalls', async () => {
+    const stalledHtml = `
+      <script>
+        Object.defineProperty(document, 'fonts', {
+          get() { return { ready: new Promise(() => {}) }; }
+        });
+      </script>
+      <div class="resume-page">Stalled content</div>
+    `;
+    await expect(generatePdf({ html: stalledHtml })).rejects.toThrow('timed out');
   }, 20000);
 
   it.each(['left', 'right'] as const)('keeps photo profile links together at %s with all projects present', async (position) => {
