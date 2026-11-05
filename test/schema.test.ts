@@ -7,6 +7,7 @@ import {
   SectionOrderSchema,
   StyleConfigSchema,
   ProjectSchema,
+  ContactInfoSchema,
 } from '../src/schema';
 import { DEFAULT_SECTION_ORDER } from '../src/constants';
 import resumeFixture from '../fixtures/resume.json';
@@ -137,5 +138,31 @@ describe('Phase 9 schemas', () => {
     expect(HeadshotSchema.safeParse({ ...raster, dataUri: 'https://example.com/photo.png' }).success).toBe(false);
     expect(HeadshotSchema.safeParse({ ...raster, dataUri: 'data:image/svg+xml;base64,PHN2Zz4=' }).success).toBe(false);
     expect(HeadshotSchema.safeParse({ ...raster, dataUri: 'data:image/png;base64,abc' }).success).toBe(false);
+  });
+
+  test.each([
+    'javascript:alert(1)',
+    'file:///etc/passwd',
+    'data:text/html,malicious',
+  ])('rejects unsafe contact link %s', (link) => {
+    const contact = {
+      email: 'alex@example.com',
+      location: 'Kuala Lumpur',
+      website: link,
+      github: link,
+      linkedin: link,
+    };
+    expect(ContactInfoSchema.safeParse(contact).success).toBe(false);
+  });
+
+  test('accepts valid http and https contact links', () => {
+    const contact = {
+      email: 'alex@example.com',
+      location: 'Kuala Lumpur',
+      website: 'https://example.com',
+      github: 'http://github.com/alex',
+      linkedin: 'https://linkedin.com/in/alex',
+    };
+    expect(ContactInfoSchema.safeParse(contact).success).toBe(true);
   });
 });

@@ -15,13 +15,20 @@ export function toMonthIndex(d: string, fill: '01' | '12'): number {
   return Number.parseInt(yearStr, 10) * 12 + Number.parseInt(monthStr, 10);
 }
 
+const SafeHttpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), {
+    message: 'Use an absolute HTTP or HTTPS URL',
+  });
+
 export const ContactInfoSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(), // Injected via CLI flag, RESUME_PHONE env, or UI input
   location: z.string().min(1),
-  github: z.string().url().optional(),
-  linkedin: z.string().url().optional(),
-  website: z.string().url().optional(),
+  github: SafeHttpUrlSchema.optional(),
+  linkedin: SafeHttpUrlSchema.optional(),
+  website: SafeHttpUrlSchema.optional(),
 });
 
 export const WorkExperienceSchema = z

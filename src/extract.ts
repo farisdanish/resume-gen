@@ -16,6 +16,26 @@ export interface ExtractResult {
   warnings: string[];
 }
 
+export function isPrivateOrBlockedHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().trim();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+    return true;
+  }
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const a = Number.parseInt(ipv4Match[1], 10);
+    const b = Number.parseInt(ipv4Match[2], 10);
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true; // Cloud metadata & link-local
+  }
+  if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80')) {
+    return true;
+  }
+  return false;
+}
+
 export async function runExtraction(opts: ExtractOptions): Promise<ExtractResult> {
   const warnings: string[] = [];
   let html = '';
@@ -36,8 +56,24 @@ export async function runExtraction(opts: ExtractOptions): Promise<ExtractResult
           ? opts.source
           : `https://${opts.source}`;
 
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(targetUrl);
+    } catch {
+      throw new Error(`Invalid URL source: ${targetUrl}`);
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error(`Unsupported protocol: ${parsedUrl.protocol}`);
+    }
+
+    if (isPrivateOrBlockedHost(parsedUrl.hostname)) {
+      throw new Error(`Access to private or metadata network address is forbidden: ${parsedUrl.hostname}`);
+    }
+
     try {
       const res = await fetch(targetUrl, {
+        signal: AbortSignal.timeout(5000),
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -49,7 +85,11 @@ export async function runExtraction(opts: ExtractOptions): Promise<ExtractResult
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);
       }
-      html = await res.text();
+      const rawText = await res.text();
+      if (rawText.length > 2 * 1024 * 1024) {
+        throw new Error('Extracted content exceeds 2MB limit');
+      }
+      html = rawText;
     } catch (err: any) {
       throw new Error(`Failed to fetch from ${targetUrl}: ${err.message}`);
     }
@@ -96,6 +136,10 @@ export async function runExtraction(opts: ExtractOptions): Promise<ExtractResult
   if (metaText) {
     const parts = metaText.split('·');
     location = parts[0].trim();
+  }
+  if (!location) {
+    location = 'Location Not Specified';
+    warnings.push('Could not detect location from hero metadata; applied fallback');
   }
 
   const mailtoHref = $('#contact a[href^="mailto:"]').attr('href') || $('a[href^="mailto:"]').attr('href');

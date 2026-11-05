@@ -32,4 +32,15 @@ describe('DOM Extractor against Fixture', () => {
     const parseResult = ResumeSchema.safeParse(data);
     expect(parseResult.success).toBe(true);
   }, 15000);
+
+  it('rejects private, loopback, and cloud metadata targets (SSRF defense)', async () => {
+    await expect(runExtraction({ source: 'http://169.254.169.254/latest/meta-data/' }))
+      .rejects.toThrow('forbidden');
+    await expect(runExtraction({ source: 'http://127.0.0.1:3000' }))
+      .rejects.toThrow('forbidden');
+    await expect(runExtraction({ source: 'http://localhost:8080' }))
+      .rejects.toThrow('forbidden');
+    await expect(runExtraction({ source: 'http://10.0.0.5' }))
+      .rejects.toThrow('forbidden');
+  });
 });
