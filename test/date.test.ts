@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDateRange, parseSingleDate } from '../src/date';
+import { formatDisplayDate, parseDateRange, parseSingleDate } from '../src/date';
 import { renderResume } from '../src/render';
 import fixture from '../fixtures/pdf-compatibility.json';
 
@@ -109,5 +109,14 @@ describe('Date Parser: Table-Driven Tests', () => {
   it('Invalid Month Rejection: "2024-13", "Mon 2024 – Present"', () => {
     expect(() => parseSingleDate('2024-13')).toThrow();
     expect(() => parseDateRange('Mon 2024 – Present')).toThrow();
+  });
+
+  it('localizes month-name dates into Bahasa Melayu (Mac, Mei, Ogos, Dis)', () => {
+    expect(formatDisplayDate('2026-03', 'month-name', 'ms')).toBe('Mac 2026');
+    expect(formatDisplayDate('2026-05', 'month-name', 'ms')).toBe('Mei 2026');
+    expect(formatDisplayDate('2026-08', 'month-name', 'ms')).toBe('Ogos 2026');
+    expect(formatDisplayDate('2026-12', 'month-name', 'ms')).toBe('Dis 2026');
+    expect(formatDisplayDate('2026', 'month-name', 'ms')).toBe('2026');
+    expect(formatDisplayDate('2026-03', 'iso', 'ms')).toBe('2026-03');
   });
 });

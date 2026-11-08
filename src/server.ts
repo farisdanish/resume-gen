@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { bodyLimit } from 'hono/body-limit';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { runExtraction } from './extract';
 import {
   ResumeSchema,
@@ -133,7 +133,68 @@ export const previewRateLimiter = new SlidingWindowRateLimiter(60, 60_000);
 
 export const app = new Hono();
 
-// Request body size limit: 1MB payload ceiling (HTTP 413)
+export const recentServerLogs: Array<{
+  requestId: string;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}> = [];
+
+export function recordServerLog(entry: {
+  requestId: string;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}) {
+  recentServerLogs.push(entry);
+  if (recentServerLogs.length > 50) recentServerLogs.shift();
+  if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
+    console.log(JSON.stringify({ ...entry, timestamp: new Date().toISOString() }));
+  }
+}
+
+// 1. Defensive Browser Security Headers (injected across all responses, including early errors)
+app.use('/*', async (c, next) => {
+  await next();
+  c.header(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none';"
+  );
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (c.req.header('x-forwarded-proto') === 'https') {
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+});
+
+// 2. Origin-Restricted CORS with Strict 403 Rejection
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/(resume|resume-gen)\.farisantoni\.com$/,
+  /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/,
+];
+
+app.use('/*', async (c, next) => {
+  const origin = c.req.header('origin');
+  if (origin) {
+    const isAllowed = ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin));
+    if (!isAllowed) {
+      return c.text('Forbidden: Invalid CORS Origin', 403);
+    }
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type');
+    c.header('Vary', 'Origin');
+  }
+  if (c.req.method === 'OPTIONS') {
+    return c.body(null, 204);
+  }
+  await next();
+});
+
+// 3. Request body size limit: 1MB payload ceiling (HTTP 413)
 app.use(
   '/api/*',
   bodyLimit({
@@ -144,8 +205,49 @@ app.use(
   })
 );
 
-// Enable CORS for local development & loopback web requests
-app.use('/*', cors());
+const KNOWN_API_ROUTES = new Set([
+  '/api/health',
+  '/api/extract',
+  '/api/preview',
+  '/api/generate-pdf',
+]);
+
+const KNOWN_STARTER_NAMES = new Set([
+  'blank',
+  'fresh-graduate',
+  'mid-senior-engineer',
+  'student-intern',
+]);
+
+export function getSafeRouteIdentifier(path: string): string {
+  if (KNOWN_API_ROUTES.has(path)) {
+    return path;
+  }
+  if (path.startsWith('/api/starters/')) {
+    const starterName = path.slice('/api/starters/'.length);
+    if (KNOWN_STARTER_NAMES.has(starterName)) {
+      return `/api/starters/${starterName}`;
+    }
+    return '/api/starters/:name';
+  }
+  return '/api/[unmatched]';
+}
+
+// 4. Zero-PII Structured Request Logger
+app.use('/api/*', async (c, next) => {
+  const start = Date.now();
+  const requestId = crypto.randomUUID();
+  c.header('X-Request-Id', requestId);
+  await next();
+  const durationMs = Date.now() - start;
+  recordServerLog({
+    requestId,
+    method: c.req.method,
+    path: getSafeRouteIdentifier(c.req.path),
+    status: c.res.status,
+    durationMs,
+  });
+});
 
 // Health check endpoint
 app.get('/api/health', (c) => {
@@ -248,6 +350,7 @@ app.post('/api/preview', async (c) => {
     if (!educationConfigResult.success) return c.json({ success: false, error: 'Invalid education display configuration', issues: educationConfigResult.error.issues }, 400);
     const html = renderResume(validation.data, { styleConfig, headings, sectionOrder, educationConfig: educationConfigResult.data });
     const { buffer, layout, pageCount, isSinglePage } = await pdfConcurrencyLimiter.run(() => generatePdf({ html }));
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     return c.json({
       success: true,
       html,
@@ -346,6 +449,7 @@ app.post('/api/generate-pdf', async (c) => {
     return c.body(new Uint8Array(buffer), 200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       'X-Page-Count': String(pageCount),
       'X-Is-Single-Page': String(isSinglePage),
       'X-Page-Target': String(pageTarget),

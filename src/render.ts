@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Handlebars from 'handlebars';
 import { EducationDisplayConfigSchema, ResumeSchema, type EducationDisplayConfig, type SectionOrder, type StyleConfigInput } from './schema';
-import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS } from './constants';
+import { DEFAULT_SECTION_ORDER, SECTION_HEADINGS, SECTION_HEADINGS_MS, TEMPLATE_LABELS } from './constants';
 import { formatDisplayDate } from './date';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,16 +82,18 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
   `;
 
   const { styleConfig, headings = {}, sectionOrder = DEFAULT_SECTION_ORDER } = options;
+  const lang = (styleConfig?.language === 'ms' ? 'ms' : 'en') as 'en' | 'ms';
+  const labels = TEMPLATE_LABELS[lang];
   const educationConfig = EducationDisplayConfigSchema.parse(options.educationConfig);
   const detail = educationConfig.mode;
   const displayResume = {
     ...resume,
-    work: resume.work.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat), end: formatDisplayDate(item.end, styleConfig?.dateFormat) })),
-    certifications: resume.certifications.map((item) => ({ ...item, date: formatDisplayDate(item.date, styleConfig?.dateFormat) })),
+    work: resume.work.map((item) => ({ ...item, start: formatDisplayDate(item.start, styleConfig?.dateFormat, lang), end: formatDisplayDate(item.end, styleConfig?.dateFormat, lang) })),
+    certifications: resume.certifications.map((item) => ({ ...item, date: formatDisplayDate(item.date, styleConfig?.dateFormat, lang) })),
     education: resume.education.map((item) => ({
       ...item,
-      start: educationConfig.showDates ? formatDisplayDate(item.start, styleConfig?.dateFormat) : undefined,
-      end: educationConfig.showDates ? formatDisplayDate(item.end, styleConfig?.dateFormat) : undefined,
+      start: educationConfig.showDates ? formatDisplayDate(item.start, styleConfig?.dateFormat, lang) : undefined,
+      end: educationConfig.showDates ? formatDisplayDate(item.end, styleConfig?.dateFormat, lang) : undefined,
       showDates: educationConfig.showDates && Boolean(item.start || item.end),
       specialization: detail !== 'compact' && educationConfig.showSpecialization ? item.specialization : undefined,
       grade: item.level !== 'spm' && detail !== 'compact' && educationConfig.showGrade ? item.grade : undefined,
@@ -199,10 +201,20 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
   const templateSource = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
   const template = Handlebars.compile(templateSource);
 
-  const resolvedHeadings = {
-    ...SECTION_HEADINGS,
-    ...headings,
-  };
+  const defaultHeadings = lang === 'ms' ? SECTION_HEADINGS_MS : SECTION_HEADINGS;
+  const resolvedHeadings: Record<string, string> = { ...defaultHeadings };
+
+  if (headings) {
+    for (const [key, val] of Object.entries(headings)) {
+      if (!val) continue;
+      const upperVal = val.trim().toUpperCase();
+      const enDefault = SECTION_HEADINGS[key as keyof typeof SECTION_HEADINGS]?.toUpperCase();
+      const isDefaultForm = upperVal === key.toUpperCase() || upperVal === enDefault;
+      if (!isDefaultForm) {
+        resolvedHeadings[key] = val;
+      }
+    }
+  }
 
   const orderedSections = sectionOrder.map((key) => ({
     key,
@@ -219,6 +231,8 @@ export function renderResume(input: unknown, options: RenderOptions = {}): strin
 
   return template({
     ...displayResume,
+    documentLanguage: lang,
+    labels,
     readableTypography: styleConfig?.bodyFontSize !== undefined,
     contactIdentity: [
       { text: resume.basics.contact.email, href: resume.basics.contact.email ? `mailto:${resume.basics.contact.email}` : undefined },

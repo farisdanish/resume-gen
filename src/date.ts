@@ -3,11 +3,17 @@ export interface ParsedDateRange {
   end: string | null;
 }
 
-export function formatDisplayDate(value: string | null | undefined, format: 'iso' | 'month-name' = 'iso') {
+export function formatDisplayDate(
+  value: string | null | undefined,
+  format: 'iso' | 'month-name' = 'iso',
+  lang: 'en' | 'ms' = 'en'
+) {
   if (!value || /^\d{4}$/.test(value)) return value;
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) throw new Error('Invalid canonical date');
   if (format === 'iso') return value;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsMs = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
+  const months = lang === 'ms' ? monthsMs : monthsEn;
   return `${months[Number(value.slice(5)) - 1]} ${value.slice(0, 4)}`;
 }
 

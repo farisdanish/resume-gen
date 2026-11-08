@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { startServer } from '../src/server';
+import { startServer, getSafeRouteIdentifier, recentServerLogs } from '../src/server';
 import type { Server } from 'node:http';
 import resumeFixture from '../fixtures/resume.json';
 import { PDFDocument } from 'pdf-lib';
@@ -367,4 +367,154 @@ describe('Server & Loopback Security Test', () => {
     expect(invalid.status).toBe(404);
   });
 
+  // --- Milestone 4 & 5 Security, Privacy & Localization Server Tests ---
+
+  test('CORS: Rejects unauthorized origins with HTTP 403 (M4-AC4)', async () => {
+    const postRes = await fetch(`${BASE_URL}/api/extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://evil-hacker.com',
+      },
+      body: JSON.stringify({ source: 'fixture' }),
+    });
+    expect(postRes.status).toBe(403);
+    expect(await postRes.text()).toContain('Forbidden: Invalid CORS Origin');
+
+    const optionsRes = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://unauthorized-domain.com' },
+    });
+    expect(optionsRes.status).toBe(403);
+  });
+
+  test('CORS: Accepts configured production and loopback origins (M4-AC4)', async () => {
+    for (const origin of [
+      'https://resume-gen.farisantoni.com',
+      'https://resume.farisantoni.com',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+    ]) {
+      const res = await fetch(`${BASE_URL}/api/health`, {
+        headers: { Origin: origin },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
+      expect(res.headers.get('vary')).toContain('Origin');
+    }
+  });
+
+  test('Defensive security headers: Injected across all responses including early 413 (M4-AC5)', async () => {
+    const health = await fetch(`${BASE_URL}/api/health`);
+    expect(health.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(health.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(health.headers.get('x-frame-options')).toBe('DENY');
+    expect(health.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+
+    // Early 413 error response must still carry security headers
+    const huge = { resume: { ...resumeFixture, basics: { ...resumeFixture.basics, summary: 'X'.repeat(1024 * 1024 + 100) } } };
+    const err413 = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(huge),
+    });
+    expect(err413.status).toBe(413);
+    expect(err413.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect(err413.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(err413.headers.get('x-frame-options')).toBe('DENY');
+  });
+
+  test('Sensitive Cache-Control: Previews and PDFs emit no-store headers (M4-AC5)', async () => {
+    const preview = await fetch(`${BASE_URL}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: resumeFixture }),
+    });
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get('cache-control')).toContain('no-store');
+
+    const pdf = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: resumeFixture }),
+    });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get('cache-control')).toContain('no-store');
+  });
+
+  test('Privacy Isolation: Two consecutive renders verify zero cross-contamination (M4-AC6)', async () => {
+    const userA = { ...resumeFixture, basics: { ...resumeFixture.basics, name: 'Alice Unique Alpha' } };
+    const userB = { ...resumeFixture, basics: { ...resumeFixture.basics, name: 'Bob Unique Beta' } };
+
+    const resA = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: userA }),
+    });
+    const bytesA = new Uint8Array(await resA.arrayBuffer());
+    const { extractText } = await import('unpdf');
+    const textA = (await extractText(bytesA, { mergePages: true })).text.toUpperCase();
+    expect(textA).toContain('ALICE UNIQUE ALPHA');
+
+    const resB = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: userB }),
+    });
+    const bytesB = new Uint8Array(await resB.arrayBuffer());
+    const textB = (await extractText(bytesB, { mergePages: true })).text.toUpperCase();
+    expect(textB).toContain('BOB UNIQUE BETA');
+    expect(textB).not.toContain('ALICE UNIQUE ALPHA');
+  });
+
+  test('Language validation: Rejects invalid languages with HTTP 400 (M5-AC11)', async () => {
+    for (const endpoint of ['preview', 'generate-pdf']) {
+      const res = await fetch(`${BASE_URL}/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume: resumeFixture, styleConfig: { language: 'fr' } }),
+      });
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toBe('Invalid style configuration');
+    }
+  });
+
+  test('BM Localization via API: Renders Bahasa Melayu headings in PDF download (M5-AC10)', async () => {
+    const res = await fetch(`${BASE_URL}/api/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resume: resumeFixture,
+        styleConfig: { language: 'ms', dateFormat: 'month-name' },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const { extractText } = await import('unpdf');
+    const text = (await extractText(bytes, { mergePages: true })).text.toUpperCase();
+    expect(text).toContain('RINGKASAN PROFESIONAL');
+    expect(text).toContain('PENGALAMAN KERJA');
+    expect(text).toContain('PENDIDIKAN');
+  });
+
+  test('Zero-PII Safe Route Logging: Arbitrary paths with PII map to constant fallback', async () => {
+    expect(getSafeRouteIdentifier('/api/health')).toBe('/api/health');
+    expect(getSafeRouteIdentifier('/api/preview')).toBe('/api/preview');
+    expect(getSafeRouteIdentifier('/api/generate-pdf')).toBe('/api/generate-pdf');
+    expect(getSafeRouteIdentifier('/api/extract')).toBe('/api/extract');
+    expect(getSafeRouteIdentifier('/api/starters/blank')).toBe('/api/starters/blank');
+    expect(getSafeRouteIdentifier('/api/private-candidate@example.com')).toBe('/api/[unmatched]');
+    expect(getSafeRouteIdentifier('/api/users/john.doe/secret-resume')).toBe('/api/[unmatched]');
+
+    const res = await fetch(`${BASE_URL}/api/private-candidate@example.com`);
+    expect(res.status).toBe(404);
+
+    const matchingLog = recentServerLogs.find((l) => l.path === '/api/[unmatched]');
+    expect(matchingLog).toBeDefined();
+
+    const leakedLog = recentServerLogs.find((l) => l.path.includes('private-candidate@example.com'));
+    expect(leakedLog).toBeUndefined();
+  });
 });

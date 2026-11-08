@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"{{#if readableTypography}} class="readable-layout"{{/if}}>
+<html lang="{{#if documentLanguage}}{{documentLanguage}}{{else}}en{{/if}}"{{#if readableTypography}} class="readable-layout"{{/if}}>
 <head>
   <meta charset="UTF-8">
   <title>{{basics.name}} - Resume</title>
@@ -49,7 +49,7 @@
           </div>
           <div class="item-meta">
             {{#if this.location}}{{this.location}} • {{/if}}
-            {{this.start}} – {{#if this.end}}{{this.end}}{{else}}Present{{/if}}
+            {{this.start}} – {{#if this.end}}{{this.end}}{{else}}{{@root.labels.present}}{{/if}}
           </div>
         </div>
         <ul class="highlight-list">
@@ -77,17 +77,17 @@
             <span class="edu-institution">{{this.institution}}</span>
           </div>
           {{#if this.showDates}}<div class="edu-meta">
-            {{#if this.start}}{{this.start}} – {{/if}}{{#if this.end}}{{this.end}}{{else}}Present{{/if}}
+            {{#if this.start}}{{this.start}} – {{/if}}{{#if this.end}}{{this.end}}{{else}}{{@root.labels.present}}{{/if}}
           </div>{{/if}}
         </div>
-        {{#if this.grade}}<div class="edu-detail">{{#if this.grade.label}}{{this.grade.label}}{{else}}CGPA{{/if}}: {{this.grade.value}} / {{this.grade.scale}}</div>{{/if}}
-        {{#if this.spmResults.overall}}<div class="edu-detail">SPM Results: {{this.spmResults.overall}}</div>{{/if}}
-        {{#if this.spmResults.bahasaMelayu}}<div class="edu-detail">Bahasa Melayu: {{this.spmResults.bahasaMelayu}}</div>{{/if}}
+        {{#if this.grade}}<div class="edu-detail">{{#if this.grade.label}}{{this.grade.label}}{{else}}{{@root.labels.cgpa}}{{/if}} {{this.grade.value}} / {{this.grade.scale}}</div>{{/if}}
+        {{#if this.spmResults.overall}}<div class="edu-detail">{{@root.labels.spmResults}} {{this.spmResults.overall}}</div>{{/if}}
+        {{#if this.spmResults.bahasaMelayu}}<div class="edu-detail">{{@root.labels.bahasaMelayu}} {{this.spmResults.bahasaMelayu}}</div>{{/if}}
         {{#each this.achievements}}<div class="edu-detail edu-achievement"><span class="edu-bullet" aria-hidden="true">•</span> <span class="edu-achievement-text">{{this}}</span></div>{{/each}}
-        {{#if this.activities.length}}<div class="edu-detail edu-activities">Activities: {{#each this.activities}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</div>{{/if}}
+        {{#if this.activities.length}}<div class="edu-detail edu-activities">{{@root.labels.activities}} {{#each this.activities}}{{this}}{{#unless @last}}; {{/unless}}{{/each}}</div>{{/if}}
         {{#if this.academicProject}}
         <div class="edu-detail edu-project-block">
-          <div class="edu-project-title">Academic Project: {{this.academicProject.title}}</div>
+          <div class="edu-project-title">{{@root.labels.academicProject}} {{this.academicProject.title}}</div>
           {{#if this.academicProject.description}}<div class="edu-project-desc">{{this.academicProject.description}}</div>{{/if}}
         </div>
         {{/if}}
@@ -164,7 +164,7 @@
         {{/each}}
       </div>
       {{else}}
-      <p class="references-request">References available upon request.</p>
+      <p class="references-request">{{@root.labels.referencesAvailable}}</p>
       {{/if}}
     </section>
     {{/if}}

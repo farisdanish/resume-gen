@@ -178,8 +178,12 @@ export const ResumeSchema = z.preprocess(normalizeEducationInput, z.object({
 
 export type Resume = z.infer<typeof ResumeSchema>;
 
+export const ResumeLanguageSchema = z.enum(['en', 'ms']).default('en');
+export type ResumeLanguage = z.infer<typeof ResumeLanguageSchema>;
+
 export const StyleConfigSchema = z
   .object({
+    language: ResumeLanguageSchema,
     fontPairing: z.enum(['modern', 'editorial', 'serif']).default('editorial'),
     bodyFontSize: z.union([z.literal(10), z.literal(11), z.literal(12)]).optional(),
     accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#2b6cb0'),
@@ -193,6 +197,7 @@ export const StyleConfigSchema = z
       .default({}),
   })
   .default({
+    language: 'en',
     fontPairing: 'editorial',
     accentColor: '#2b6cb0',
     density: 'standard',

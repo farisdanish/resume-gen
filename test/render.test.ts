@@ -205,4 +205,44 @@ describe('Template & Render Engine', () => {
     expect(html).toContain('class="edu-project-desc"');
     expect(html).toContain('A Raft-based distributed key-value storage engine implemented in Go.');
   });
+
+  it('renders root-scoped Bahasa Melayu labels inside nested loops and sets html lang="ms"', () => {
+    const resume = {
+      ...resumeFixture,
+      education: [{
+        ...resumeFixture.education[0],
+        end: null, // Should render Kini
+        activities: ['Kelab Robotik', 'Kelab Debat'],
+        academicProject: { title: 'Sistem Temujanji' },
+      }],
+      references: { mode: 'available-on-request' as const },
+    };
+    const html = renderResume(resume, {
+      styleConfig: { language: 'ms', dateFormat: 'month-name' },
+      educationConfig: { mode: 'detailed', showAcademicProject: true, showActivities: true },
+    });
+
+    expect(html).toContain('<html lang="ms"');
+    expect(html).toContain('Ringkasan Profesional');
+    expect(html).toContain('Pengalaman Kerja');
+    expect(html).toContain('Pendidikan');
+    expect(html).toContain('Kini'); // From @root.labels.present inside loop
+    expect(html).toContain('Aktiviti: Kelab Robotik; Kelab Debat');
+    expect(html).toContain('Projek Akademik: Sistem Temujanji');
+    expect(html).toContain('Rujukan disediakan atas permintaan.');
+  });
+
+  it('preserves user-edited custom headings when language="ms"', () => {
+    const html = renderResume(resumeFixture, {
+      styleConfig: { language: 'ms' },
+      headings: {
+        EXPERIENCE: 'REKOD PERKHIDMATAN & KEPIMPINAN',
+        SUMMARY: 'SUMMARY', // Default uppercase form should resolve to BM
+      },
+    });
+
+    expect(html).toContain('REKOD PERKHIDMATAN &amp; KEPIMPINAN'); // Custom heading preserved
+    expect(html).toContain('Ringkasan Profesional'); // Default form translated to BM
+    expect(html).toContain('Pendidikan');
+  });
 });

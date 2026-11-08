@@ -8,6 +8,37 @@ export const SECTION_HEADINGS = {
   REFERENCES: 'References',
 } as const;
 
+export const SECTION_HEADINGS_MS = {
+  SUMMARY: 'Ringkasan Profesional',
+  EXPERIENCE: 'Pengalaman Kerja',
+  EDUCATION: 'Pendidikan',
+  SKILLS: 'Kemahiran Teknikal',
+  PROJECTS: 'Projek',
+  CERTIFICATIONS: 'Persijilan',
+  REFERENCES: 'Rujukan',
+} as const;
+
+export const TEMPLATE_LABELS = {
+  en: {
+    present: 'Present',
+    activities: 'Activities:',
+    academicProject: 'Academic Project:',
+    cgpa: 'CGPA:',
+    spmResults: 'SPM Results:',
+    bahasaMelayu: 'Bahasa Melayu:',
+    referencesAvailable: 'References available upon request.',
+  },
+  ms: {
+    present: 'Kini',
+    activities: 'Aktiviti:',
+    academicProject: 'Projek Akademik:',
+    cgpa: 'PNGK:',
+    spmResults: 'Keputusan SPM:',
+    bahasaMelayu: 'Bahasa Melayu:',
+    referencesAvailable: 'Rujukan disediakan atas permintaan.',
+  },
+} as const;
+
 export const SECTION_KEYS = [
   'summary',
   'experience',
