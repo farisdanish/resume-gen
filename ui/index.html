@@ -33,6 +33,8 @@
           <div class="help-menu-separator" role="separator"></div>
           <button type="button" role="menuitem" tabindex="-1" id="menu-file-export-json">Save Profile JSON…</button>
           <button type="button" role="menuitem" tabindex="-1" id="menu-file-import-json">Load Profile JSON…</button>
+          <div class="help-menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-file-clear-data">Clear All Local Data…</button>
         </div>
       </div>
       <div class="menu-item" id="menu-edit"><u>E</u>dit</div>
@@ -49,6 +51,9 @@
           <button type="button" role="menuitem" tabindex="-1" data-help-dialog="help-topics">Help Topics…</button>
           <a role="menuitem" tabindex="-1" href="https://github.com/farisdanish/resume-gen/issues/new"
             target="_blank" rel="noopener noreferrer">Report an Issue…</a>
+          <div class="help-menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" tabindex="-1" id="menu-help-wizard">Resume Setup Wizard…</button>
+          <button type="button" role="menuitem" tabindex="-1" data-help-dialog="modal-pdpa-notice">PDPA & Privacy…</button>
           <div class="help-menu-separator" role="separator"></div>
           <button type="button" role="menuitem" tabindex="-1" data-help-dialog="help-about">About Resume Generator…</button>
         </div>
@@ -92,6 +97,11 @@
         <option value="2.0">200%</option>
         <option value="fit">Fit Page</option>
       </select>
+      <div class="tool-sep" id="mobile-view-sep" style="display: none;"></div>
+      <div id="mobile-view-toggle">
+        <button type="button" class="tool-btn active" id="btn-view-editor" title="Editor View">📝 Edit</button>
+        <button type="button" class="tool-btn" id="btn-view-preview" title="Preview View">📄 Preview</button>
+      </div>
     </div>
 
     <!-- 4. Formatting Toolbar -->
@@ -532,6 +542,13 @@
             </fieldset>
             <fieldset class="win-fieldset">
               <legend class="win-legend">Section Structure</legend>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label for="select-resume-language" class="form-label">Resume Language (Bahasa):</label>
+                <select id="select-resume-language" class="win-input">
+                  <option value="en" selected>English (Default)</option>
+                  <option value="ms">Bahasa Melayu</option>
+                </select>
+              </div>
               <div style="font-size: 10px; color: #555; margin-bottom: 8px;">
                 Custom heading titles for ATS and section visibility:
               </div>
@@ -589,9 +606,10 @@
     <footer class="win-statusbar">
       <div class="status-cell status-flex" id="status-bar-text">Ready</div>
       <div class="status-cell" id="status-page-count">Page 1/1</div>
-      <div class="status-cell">A4 Portrait</div>
+      <div class="status-cell status-cell-optional">A4 Portrait</div>
       <div class="status-cell"><span class="status-badge badge-ok" id="status-ats-badge">Data: Waiting</span></div>
-      <div class="status-cell" id="status-host">127.0.0.1:3000</div>
+      <div class="status-cell" id="status-pdpa" style="cursor: pointer;" title="View PDPA Zero-Retention Disclosure"><span class="status-badge badge-ok">🔒 PDPA: 0 Data Stored</span></div>
+      <div class="status-cell status-cell-optional" id="status-host">127.0.0.1:3000</div>
     </footer>
   </div>
 
@@ -712,6 +730,92 @@
     <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
       <button type="button" class="win-button win-button-primary" id="btn-retry-busy" disabled>Retry Now</button>
       <button type="button" class="win-button" data-close-server-busy>Dismiss</button>
+    </div>
+  </dialog>
+
+  <!-- Clear All Local Data Confirmation Dialog -->
+  <dialog id="modal-clear-data" class="help-dialog bevel-outset" aria-labelledby="clear-data-title">
+    <div class="win-titlebar">
+      <h2 id="clear-data-title">Clear All Local Data</h2>
+      <button type="button" class="win-btn-control" data-close-clear-data aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <p style="margin: 4px 0 8px 0; font-weight: bold;">Are you sure you want to permanently clear all local data?</p>
+      <p style="font-size: 11px; color: #444; margin-bottom: 6px;">
+        This action will permanently erase your current draft, all saved named profiles, assistant settings, and tutorial flags from this browser. A clean blank document will be loaded.
+      </p>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button type="button" class="win-button win-button-primary" id="btn-confirm-clear">Clear Everything</button>
+      <button type="button" class="win-button" data-close-clear-data>Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- PDPA & Privacy Notice Dialog -->
+  <dialog id="modal-pdpa-notice" class="help-dialog bevel-outset" aria-labelledby="pdpa-notice-title">
+    <div class="win-titlebar">
+      <h2 id="pdpa-notice-title">PDPA & Privacy Notice</h2>
+      <button type="button" class="win-btn-control" data-close-pdpa aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content">
+      <p><b>Zero Server Data Retention Guarantee</b></p>
+      <p style="margin-top: 4px;">In accordance with Personal Data Protection principles:</p>
+      <ul style="margin: 8px 0 8px 18px; font-size: 11px; line-height: 1.5;">
+        <li>Your candidate details, contact links, and headshots are never stored on our servers or databases.</li>
+        <li>All drafts and named profiles exist purely in your browser's local storage (<code>localStorage</code>).</li>
+        <li>Candidate data is processed purely in-memory on the server and is never written to disk, persistent databases, or server logs. Ephemeral buffers are discarded upon response completion.</li>
+        <li>Server logs record only anonymous request durations and HTTP status codes, never candidate PII.</li>
+      </ul>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button type="button" class="win-button win-button-primary" data-close-pdpa autofocus>OK</button>
+    </div>
+  </dialog>
+
+  <!-- Guided Tutorial Wizard Modal -->
+  <dialog id="modal-tutorial" class="help-dialog bevel-outset" aria-labelledby="tutorial-title">
+    <div class="win-titlebar">
+      <h2 id="tutorial-title">Microsoft Resume 2000 - Setup Wizard</h2>
+      <button type="button" class="win-btn-control" data-close-tutorial aria-label="Close">×</button>
+    </div>
+    <div class="help-dialog-content" style="min-height: 220px;">
+      <div id="tutorial-step-1" class="wizard-step">
+        <p style="font-weight: bold; margin-bottom: 6px;">Step 1 of 5: Choose a Starting Point</p>
+        <p style="font-size: 11px; margin-bottom: 10px;">Select how you would like to begin authoring your résumé:</p>
+        <div class="radio-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="radio-label"><input type="radio" name="wiz-starter" value="blank" checked> <span><b>Start Blank</b> — Clean empty skeleton</span></label>
+          <label class="radio-label"><input type="radio" name="wiz-starter" value="fresh-graduate"> <span><b>Fresh Graduate</b> — Education & campus projects</span></label>
+          <label class="radio-label"><input type="radio" name="wiz-starter" value="mid-senior-engineer"> <span><b>Experienced Engineer</b> — Quantified metrics & roles</span></label>
+          <label class="radio-label"><input type="radio" name="wiz-starter" value="student-intern"> <span><b>Student / Intern</b> — Coursework & activities</span></label>
+          <label class="radio-label"><input type="radio" name="wiz-starter" value="sample"> <span><b>Demo Profile</b> — Alex Morgan standard sample</span></label>
+        </div>
+      </div>
+      <div id="tutorial-step-2" class="wizard-step" hidden>
+        <p style="font-weight: bold; margin-bottom: 6px;">Step 2 of 5: Candidate Basics & Contact</p>
+        <p style="font-size: 11px; line-height: 1.4;">Fill in your candidate name, professional headline, and summary statement in the <b>Content</b> tab. Provide contact links (GitHub, LinkedIn, Website, Phone) and optionally upload a professional headshot photo.</p>
+      </div>
+      <div id="tutorial-step-3" class="wizard-step" hidden>
+        <p style="font-weight: bold; margin-bottom: 6px;">Step 3 of 5: Content Authoring & Section CRUD</p>
+        <p style="font-size: 11px; line-height: 1.4;">Add and customize work roles, education degrees, skills categories, and projects using the <code>+ Add Position</code> and <code>+ Add Education</code> buttons. Use checkboxes to toggle items on or off to tailor your résumé.</p>
+      </div>
+      <div id="tutorial-step-4" class="wizard-step" hidden>
+        <p style="font-weight: bold; margin-bottom: 6px;">Step 4 of 5: Design, Typography & Section Order</p>
+        <p style="font-size: 11px; line-height: 1.4;">Adjust fonts (Traditional Carlito vs Modern Inter), readable body sizes (10/11/12 pt), accent colors, and margin density in the <b>Design</b> tab. Reorder sections in <b>Sections</b> (e.g. Education first for graduates).</p>
+      </div>
+      <div id="tutorial-step-5" class="wizard-step" hidden>
+        <p style="font-weight: bold; margin-bottom: 6px;">Step 5 of 5: Budget Guard & ATS Export</p>
+        <p style="font-size: 11px; line-height: 1.4;">The budget meter monitors page fullness in real-time. Choose a 1-page or 2-page target. When ready, click <b>Export PDF</b> to generate an ATS-compliant PDF with continuous text extraction.</p>
+      </div>
+    </div>
+    <div class="help-dialog-actions" style="display: flex; justify-content: space-between; align-items: center;">
+      <label style="font-size: 10px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+        <input type="checkbox" id="chk-tutorial-dont-show"> Do not show on startup
+      </label>
+      <div style="display: flex; gap: 4px;">
+        <button type="button" class="win-button" id="btn-wiz-prev" disabled>Back</button>
+        <button type="button" class="win-button win-button-primary" id="btn-wiz-next">Next</button>
+        <button type="button" class="win-button" id="btn-wiz-skip">Skip</button>
+      </div>
     </div>
   </dialog>
 

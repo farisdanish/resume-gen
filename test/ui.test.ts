@@ -29,6 +29,11 @@ describe('Editor preview and budget flow', () => {
 
   async function openEditor(page: Page) {
     await page.goto(baseUrl);
+    await page.evaluate(() => {
+      localStorage.setItem('resume_tutorial_dismissed', 'true');
+      const tut = document.getElementById('modal-tutorial') as HTMLDialogElement;
+      if (tut?.open) tut.close();
+    });
     await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
   }
 
@@ -936,6 +941,379 @@ describe('Editor preview and budget flow', () => {
         page.locator('#btn-download-pdf').click(),
       ]);
       expect(download.suggestedFilename()).toBe('ALEX_MORGAN_BACKEND_SOFTWARE_ENGINEER_LARAVEL_DATA_PIPELINES_APIS_PYTHON_INTEROP.pdf');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  // --- Milestone 4 & 5 UI Feature Tests ---
+
+  it('mobile view switcher toggles editor/preview and applies auto-fit scaling (M4-AC1, M4-AC2)', async () => {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 375, height: 667 });
+    try {
+      await openEditor(page);
+      const switcher = page.locator('#mobile-view-toggle');
+      expect(await switcher.isVisible()).toBe(true);
+
+      const taskpane = page.locator('.taskpane');
+      const canvas = page.locator('.document-canvas');
+
+      // Default on mobile: Editor is active, Canvas is hidden
+      expect(await taskpane.isVisible()).toBe(true);
+      expect(await canvas.isVisible()).toBe(false);
+
+      // Switch to Preview
+      await page.locator('#btn-view-preview').click();
+      expect(await taskpane.isVisible()).toBe(false);
+      expect(await canvas.isVisible()).toBe(true);
+
+      // Check taskpane min-width is overridden to 0 on mobile
+      const minWidth = await taskpane.evaluate((el) => window.getComputedStyle(el).minWidth);
+      expect(minWidth).toBe('0px');
+
+      // Check mobile toolbar touch bounds: height must accommodate 40px touch targets without clipping
+      const toolbarHeight = await page.locator('.win-toolbar').first().evaluate((el) => el.clientHeight);
+      expect(toolbarHeight).toBeGreaterThanOrEqual(44);
+      const buttonHeight = await page.locator('.win-toolbar .tool-btn').first().evaluate((el) => el.clientHeight);
+      expect(buttonHeight).toBeGreaterThanOrEqual(40);
+
+      // Switch back to Editor
+      await page.locator('#btn-view-editor').click();
+      expect(await taskpane.isVisible()).toBe(true);
+      expect(await canvas.isVisible()).toBe(false);
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('menubar reachability: hides decorative items on mobile and dropdown opens (M4-AC3)', async () => {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 375, height: 667 });
+    try {
+      await openEditor(page);
+      // Non-functional decorative items must be hidden
+      expect(await page.locator('#menu-edit').isVisible()).toBe(false);
+      expect(await page.locator('#menu-tools').isVisible()).toBe(false);
+
+      // File and Help must remain visible
+      expect(await page.locator('#menu-file').isVisible()).toBe(true);
+      expect(await page.locator('#menu-help').isVisible()).toBe(true);
+
+      // Open file dropdown: visible without overflow clipping
+      await page.locator('#menu-file').click();
+      const dropdown = page.locator('#file-dropdown');
+      expect(await dropdown.isVisible()).toBe(true);
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('PDPA modal: Opens from status bar indicator and closes cleanly (M4-AC4)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      const pdpaBadge = page.locator('#status-pdpa');
+      expect(await pdpaBadge.isVisible()).toBe(true);
+
+      await pdpaBadge.click();
+      const modal = page.locator('#modal-pdpa-notice');
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+      expect(await modal.textContent()).toContain('Zero Server Data Retention Guarantee');
+
+      await modal.locator('[data-close-pdpa]').first().click();
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Clear All Local Data: Cancels work, purges all keys, and resets to blank slate (M4-AC7)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      // Seed real data across all stored keys
+      await page.evaluate(() => {
+        localStorage.setItem('resume_gen_draft_v1', JSON.stringify({ basics: { name: 'Disposable User' } }));
+        localStorage.setItem('resume_gen_profiles_v1', JSON.stringify({ version: 1, profiles: [{ id: 'p1', name: 'Profile 1', bundle: {} }] }));
+        localStorage.setItem('resume_gen_office_assistant_enabled', 'false');
+        localStorage.setItem('resume_tutorial_dismissed', 'true');
+      });
+
+      // Verify real data is present in localStorage before clearing
+      const initialProfiles = await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'));
+      expect(initialProfiles).not.toBeNull();
+
+      // Trigger Clear All Local Data
+      await page.locator('#menu-file').click();
+      await page.locator('#menu-file-clear-data').click();
+
+      const modal = page.locator('#modal-clear-data');
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+
+      await page.locator('#btn-confirm-clear').click();
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+
+      // Verify all 4 actual keys are purged
+      const keys = await page.evaluate(() => ({
+        draft: localStorage.getItem('resume_gen_draft_v1'),
+        profiles: localStorage.getItem('resume_gen_profiles_v1'),
+        assistant: localStorage.getItem('resume_gen_office_assistant_enabled'),
+        tutorial: localStorage.getItem('resume_tutorial_dismissed'),
+      }));
+      expect(keys.draft).toBeNull();
+      expect(keys.profiles).toBeNull();
+      expect(keys.assistant).toBeNull();
+      expect(keys.tutorial).toBeNull();
+
+      // Verify status bar text
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent?.includes('All local data cleared'));
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Clear All Local Data: In-flight save operations are invalidated and cannot restore data after clear', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('Slow Profile');
+
+      // Intercept /api/preview to artificially delay validation for saveNamedProfile
+      let resolvePreview: () => void;
+      const previewDelayed = new Promise<void>((r) => { resolvePreview = r; });
+      let hasDelayed = false;
+
+      await page.route('**/api/preview', async (route) => {
+        if (!hasDelayed) {
+          hasDelayed = true;
+          await previewDelayed;
+        }
+        await route.continue();
+      });
+
+      // Trigger save (which starts in-flight validation)
+      await page.locator('#btn-save-named-profile').click();
+
+      // While save is in-flight, trigger Clear All Local Data
+      await page.locator('#menu-file').click();
+      await page.locator('#menu-file-clear-data').click();
+      await page.locator('#btn-confirm-clear').click();
+
+      // Unblock the delayed preview
+      resolvePreview!();
+      await page.waitForTimeout(500);
+
+      // Verify that resume_gen_profiles_v1 was NOT repopulated by the late-resolving save
+      const profiles = await page.evaluate(() => localStorage.getItem('resume_gen_profiles_v1'));
+      expect(profiles).toBeNull();
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Clear All Local Data: In-flight file read operations cannot restore data after clear', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+
+      // Delay FileReader in page
+      await page.evaluate(() => {
+        const origRead = FileReader.prototype.readAsText;
+        (window as any).__releaseRead = null;
+        FileReader.prototype.readAsText = function(blob: Blob, encoding?: string) {
+          const self = this;
+          new Promise<void>((resolve) => { (window as any).__releaseRead = resolve; }).then(() => {
+            origRead.call(self, blob, encoding);
+          });
+        };
+      });
+
+      // Start import of a candidate profile
+      const candidatePayload = JSON.stringify({
+        ...resumeFixture,
+        basics: { ...resumeFixture.basics, name: 'Secret Candidate' },
+      });
+      await page.locator('#input-import-json').setInputFiles({
+        name: 'secret.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(candidatePayload),
+      });
+
+      // While read is pending, clear all local data
+      await page.locator('#menu-file').click();
+      await page.locator('#menu-file-clear-data').click();
+      await page.locator('#btn-confirm-clear').click();
+
+      // Release delayed read
+      await page.evaluate(() => {
+        if ((window as any).__releaseRead) (window as any).__releaseRead();
+      });
+      await page.waitForTimeout(500);
+
+      // Verify draft storage remains null and editor does not have the secret candidate
+      const draft = await page.evaluate(() => localStorage.getItem('resume_gen_draft_v1'));
+      expect(draft).toBeNull();
+      const nameVal = await page.locator('#edit-name').inputValue();
+      expect(nameVal).not.toBe('Secret Candidate');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Clear All Local Data: In-flight extraction requests cannot restore data after clear', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+
+      // Intercept /api/extract to artificially delay response
+      let resolveExtract: () => void;
+      const extractDelayed = new Promise<void>((r) => { resolveExtract = r; });
+      let hasDelayed = false;
+
+      await page.route('**/api/extract', async (route) => {
+        if (!hasDelayed) {
+          hasDelayed = true;
+          await extractDelayed;
+        }
+        await route.continue();
+      });
+
+      // Trigger extraction
+      await page.locator('#btn-extract').click();
+
+      // While extraction is in-flight, trigger Clear All Local Data
+      await page.locator('#menu-file').click();
+      await page.locator('#menu-file-clear-data').click();
+      await page.locator('#btn-confirm-clear').click();
+
+      // Release delayed extraction
+      resolveExtract!();
+      await page.waitForTimeout(500);
+
+      // Verify draft storage remains null and editor does not restore candidate data ("Alex Morgan")
+      const draft = await page.evaluate(() => localStorage.getItem('resume_gen_draft_v1'));
+      expect(draft).toBeNull();
+      const nameVal = await page.locator('#edit-name').inputValue();
+      expect(nameVal).toBe('Your Name');
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Profile Controls: Importing during a profile save does not leave profile controls permanently disabled', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-source"]').click();
+      await page.locator('#profile-name').fill('Profile Pending Save');
+
+      // Intercept /api/preview to delay save validation
+      let resolvePreview: () => void;
+      const previewDelayed = new Promise<void>((r) => { resolvePreview = r; });
+      let hasDelayed = false;
+
+      await page.route('**/api/preview', async (route) => {
+        if (!hasDelayed) {
+          hasDelayed = true;
+          await previewDelayed;
+        }
+        await route.continue();
+      });
+
+      // Trigger save (libraryBusy becomes true)
+      await page.locator('#btn-save-named-profile').click();
+      expect(await page.locator('#btn-save-named-profile').isDisabled()).toBe(true);
+
+      // Import JSON while save is in-flight
+      const importPayload = JSON.stringify({
+        ...resumeFixture,
+        basics: { ...resumeFixture.basics, name: 'Imported Profile User' },
+      });
+      await page.locator('#input-import-json').setInputFiles({
+        name: 'imported.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(importPayload),
+      });
+
+      // Release delayed preview
+      resolvePreview!();
+      await page.waitForTimeout(500);
+
+      // Ensure save button is re-enabled and not permanently disabled
+      const isSaveDisabled = await page.locator('#btn-save-named-profile').isDisabled();
+      expect(isSaveDisabled).toBe(false);
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Setup Wizard: Suppressed when draft exists, auto-shows on fresh visit, and relaunches from Help (M5-AC8)', async () => {
+    const page = await browser.newPage();
+    try {
+      // 1. Fresh visit without draft or dismissal flag
+      await page.goto(baseUrl);
+      const modal = page.locator('#modal-tutorial');
+      await page.waitForFunction(() => (document.getElementById('modal-tutorial') as HTMLDialogElement)?.open);
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+
+      // Step through wizard
+      await modal.locator('#btn-wiz-next').click(); // to step 2
+      expect(await modal.locator('#tutorial-step-2').isVisible()).toBe(true);
+      await modal.locator('#btn-wiz-prev').click(); // back to step 1
+      expect(await modal.locator('#tutorial-step-1').isVisible()).toBe(true);
+
+      // Dismiss with "Do not show on startup"
+      await modal.locator('#chk-tutorial-dont-show').check();
+      await modal.locator('#btn-wiz-skip').click();
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+
+      const dismissed = await page.evaluate(() => localStorage.getItem('resume_tutorial_dismissed'));
+      expect(dismissed).toBe('true');
+
+      // Reload: wizard should not show
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(false);
+
+      // Relaunch from Help menu
+      await page.locator('#menu-help').click();
+      await page.locator('#menu-help-wizard').click();
+      expect(await modal.evaluate((el: HTMLDialogElement) => el.open)).toBe(true);
+      await modal.locator('#btn-wiz-skip').click();
+    } finally {
+      await page.close();
+    }
+  }, 30000);
+
+  it('Bahasa Melayu language toggle: Re-renders preview and roundtrips through draft save (M5-AC9, M5-AC10)', async () => {
+    const page = await browser.newPage();
+    try {
+      await openEditor(page);
+      await page.locator('[data-tab="tab-sections"]').click();
+
+      const langSelect = page.locator('#select-resume-language');
+      expect(await langSelect.inputValue()).toBe('en');
+
+      // Change language to Bahasa Melayu
+      await langSelect.selectOption('ms');
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+
+      const text = await previewText(page);
+      expect(text.toUpperCase()).toContain('RINGKASAN PROFESIONAL');
+      expect(text.toUpperCase()).toContain('PENGALAMAN KERJA');
+
+      // Verify persisted in localStorage draft
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('resume_gen_draft_v1')!));
+      expect(draft.styleConfig.language).toBe('ms');
+
+      // Reload page and verify still in BM mode
+      await page.reload();
+      await page.waitForFunction(() => document.getElementById('status-bar-text')?.textContent === 'Document preview ready');
+      expect(await page.locator('#select-resume-language').inputValue()).toBe('ms');
+      const textAfter = await previewText(page);
+      expect(textAfter.toUpperCase()).toContain('RINGKASAN PROFESIONAL');
     } finally {
       await page.close();
     }

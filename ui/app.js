@@ -59,6 +59,10 @@ import { PdfPreview } from './pdf-preview.js';
   let sectionOrder = [...DEFAULT_SECTION_ORDER];
   let pageTarget = 1;
   let educationConfig = { ...DEFAULT_EDUCATION_CONFIG };
+  let activeOperationId = 0;
+  let profileAbortController = null;
+  let extractAbortController = null;
+  let activeFileReader = null;
   const openEducationCards = new Set();
   let currentBudgetState = 'waiting';
   const dismissedAssistantStates = new Set();
@@ -154,6 +158,7 @@ import { PdfPreview } from './pdf-preview.js';
   const selectHeaderAlignment = document.getElementById('select-header-alignment');
   const sectionScaleControls = document.getElementById('section-scale-controls');
   const btnResetSectionScales = document.getElementById('btn-reset-section-scales');
+  const selectResumeLanguage = document.getElementById('select-resume-language');
 
   // DOM Elements - Section Headings
   const headingSummary = document.getElementById('heading-summary');
@@ -456,6 +461,11 @@ import { PdfPreview } from './pdf-preview.js';
     loadNamedButton.disabled = !libraryAvailable || libraryBusy || !profileList.value;
   }
 
+  function setLibraryBusy(busy) {
+    libraryBusy = busy;
+    refreshLibraryButtons();
+  }
+
   function readProfileLibrary() {
     const raw = localStorage.getItem(PROFILE_LIBRARY_KEY);
     if (!raw) return { version: 1, profiles: [] };
@@ -495,8 +505,11 @@ import { PdfPreview } from './pdf-preview.js';
       libraryMessage.textContent = 'Enter a profile name of 1–80 characters.';
       return;
     }
-    libraryBusy = true;
-    refreshLibraryButtons();
+    const operationId = ++activeOperationId;
+    profileAbortController?.abort();
+    const controller = new AbortController();
+    profileAbortController = controller;
+    setLibraryBusy(true);
     try {
       const library = readProfileLibrary();
       const selected = library.profiles.find((entry) => entry.id === profileList.value);
@@ -512,7 +525,8 @@ import { PdfPreview } from './pdf-preview.js';
       }
       const previousLibrary = localStorage.getItem(PROFILE_LIBRARY_KEY);
       const bundle = currentProfileBundle();
-      await validateImportedProfile(parseImportedProfile(bundle));
+      await validateImportedProfile(parseImportedProfile(bundle), controller.signal);
+      if (operationId !== activeOperationId) return;
       if (localStorage.getItem(PROFILE_LIBRARY_KEY) !== previousLibrary) throw new Error('Saved profiles changed in another tab; retry');
       const entry = { id: update ? selected.id : crypto.randomUUID(), name, bundle };
       const profiles = update ? library.profiles.map((item) => item.id === selected.id ? entry : item) : [...library.profiles, entry];
@@ -521,17 +535,21 @@ import { PdfPreview } from './pdf-preview.js';
       populateProfileLibrary(entry.id);
       libraryMessage.textContent = `${update ? 'Updated' : 'Saved'} ${name}.`;
     } catch (error) {
+      if (operationId !== activeOperationId) return;
       libraryMessage.textContent = `Could not save profile: ${error.message}. Your draft and saved profiles are unchanged.`;
     } finally {
-      libraryBusy = false;
-      refreshLibraryButtons();
+      if (profileAbortController === controller) profileAbortController = null;
+      setLibraryBusy(false);
     }
   }
 
   async function loadNamedProfile() {
     if (libraryBusy || !libraryAvailable || !draftResume) return;
-    libraryBusy = true;
-    refreshLibraryButtons();
+    const operationId = ++activeOperationId;
+    profileAbortController?.abort();
+    const controller = new AbortController();
+    profileAbortController = controller;
+    setLibraryBusy(true);
     try {
       const entry = readProfileLibrary().profiles.find((item) => item.id === profileList.value);
       if (!entry) throw new Error('Choose a saved profile');
@@ -540,7 +558,8 @@ import { PdfPreview } from './pdf-preview.js';
       if (savedNamedSnapshot !== null && before !== savedNamedSnapshot
         && !confirm('Load this saved profile? This replaces your current edits. Download Save Profile first to keep a portable copy.')) return;
       const profile = parseImportedProfile(structuredClone(entry.bundle));
-      await validateImportedProfile(profile);
+      await validateImportedProfile(profile, controller.signal);
+      if (operationId !== activeOperationId) return;
       if (before !== profileFingerprint(currentProfileBundle())) throw new Error('The draft changed while loading; retry');
       // Persist the replacement before mutating the active state, so quota errors cannot discard it.
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...profile, version: PROFILE_VERSION, savedAt: new Date().toISOString() }));
@@ -549,12 +568,14 @@ import { PdfPreview } from './pdf-preview.js';
       profileName.value = entry.name;
       populateContentForm();
       await renderPreview();
+      if (operationId !== activeOperationId) return;
       libraryMessage.textContent = `Loaded ${entry.name}.`;
     } catch (error) {
+      if (operationId !== activeOperationId) return;
       libraryMessage.textContent = `Could not load profile: ${error.message}. Your active draft is unchanged.`;
     } finally {
-      libraryBusy = false;
-      refreshLibraryButtons();
+      if (profileAbortController === controller) profileAbortController = null;
+      setLibraryBusy(false);
     }
   }
 
@@ -725,6 +746,7 @@ import { PdfPreview } from './pdf-preview.js';
     if (selectMargins) selectMargins.value = styleConfig.margins || 'standard';
     if (selectBodyAlignment) selectBodyAlignment.value = styleConfig.bodyAlignment || 'justify';
     if (selectHeaderAlignment) selectHeaderAlignment.value = styleConfig.headerAlignment || 'left';
+    if (selectResumeLanguage) selectResumeLanguage.value = styleConfig.language || 'en';
     renderSectionScaleControls();
     updateAccentColorUI(styleConfig.accentColor || '#2b6cb0');
 
@@ -1540,6 +1562,7 @@ import { PdfPreview } from './pdf-preview.js';
   });
 
   selectDateFormat?.addEventListener('change', (e) => { styleConfig.dateFormat = e.target.value; scheduleDebouncedPreview(); });
+  selectResumeLanguage?.addEventListener('change', (e) => { styleConfig.language = e.target.value; scheduleDebouncedPreview(); });
   selectPageTarget?.addEventListener('change', (e) => {
     pageTarget = Number(e.target.value);
     document.getElementById('budget-label').textContent = `Measured fullness of ${pageTarget}-page target`;
@@ -1744,6 +1767,12 @@ import { PdfPreview } from './pdf-preview.js';
 
   // --- Network API Actions ---
   async function extractData(restoreStored = false) {
+    const operationId = ++activeOperationId;
+    extractAbortController?.abort();
+    const controller = new AbortController();
+    extractAbortController = controller;
+    setLibraryBusy(false);
+
     try {
       setStatus('Extracting resume DOM...');
       const sourceType = document.querySelector('input[name="source-type"]:checked')?.value || 'fixture';
@@ -1755,12 +1784,14 @@ import { PdfPreview } from './pdf-preview.js';
       log(`Requesting extraction from source: "${source}"...`, 'info');
 
       const res = await fetch(getApiUrl('/api/extract'), {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source, phoneOverride }),
       });
 
       const result = await res.json();
+      if (operationId !== activeOperationId) return;
 
       if (!res.ok || !result.success) {
         log(`Extraction error: ${result.error || 'Zod validation failed'}`, 'error');
@@ -1775,6 +1806,7 @@ import { PdfPreview } from './pdf-preview.js';
         return;
       }
 
+      if (operationId !== activeOperationId) return;
       pristineResume = result.data;
 
       // If no stored draft, initialize from pristine
@@ -1806,12 +1838,16 @@ import { PdfPreview } from './pdf-preview.js';
         } catch { /* The corrupt library stays unavailable; the active draft remains usable. */ }
       }
       await renderPreview();
+      if (operationId !== activeOperationId) return;
     } catch (err) {
+      if (operationId !== activeOperationId) return;
       log(`Extraction network error: ${err.message}`, 'error');
       if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
         log('[Troubleshooting] Is the dev server running? Ensure "npm run dev" is running at 127.0.0.1:3000.', 'warn');
       }
       setStatus('Network error', 'Offline');
+    } finally {
+      if (extractAbortController === controller) extractAbortController = null;
     }
   }
 
@@ -2249,11 +2285,16 @@ import { PdfPreview } from './pdf-preview.js';
 
   async function loadStarterArchetype(name) {
     executeWithDirtyCheck(async () => {
+      const operationId = ++activeOperationId;
+      profileAbortController?.abort();
+      const controller = new AbortController();
+      profileAbortController = controller;
+      setLibraryBusy(false);
       try {
         setStatus(`Loading ${name} archetype...`);
         let starterData = STARTER_FIXTURES[name];
         try {
-          const res = await fetch(getApiUrl(`/api/starters/${name}`));
+          const res = await fetch(getApiUrl(`/api/starters/${name}`), { signal: controller.signal });
           if (res.ok) {
             const json = await res.json();
             if (json.success && json.data) {
@@ -2263,6 +2304,7 @@ import { PdfPreview } from './pdf-preview.js';
         } catch {
           // Keep inlined fallback
         }
+        if (operationId !== activeOperationId) return;
         if (!starterData) {
           log(`Starter archetype "${name}" not found.`, 'error');
           setStatus('Archetype not found', 'Error');
@@ -2290,11 +2332,15 @@ import { PdfPreview } from './pdf-preview.js';
         populateContentForm();
         document.querySelector('[data-tab="tab-content"]')?.click();
         await renderPreview();
+        if (operationId !== activeOperationId) return;
         log(`Loaded "${name}" archetype.`, 'success');
         setStatus('Document ready', 'Ready');
       } catch (err) {
+        if (operationId !== activeOperationId) return;
         log(`Failed to load starter archetype: ${err.message}`, 'error');
         setStatus('Error loading archetype', 'Error');
+      } finally {
+        if (profileAbortController === controller) profileAbortController = null;
       }
     });
   }
@@ -2419,11 +2465,13 @@ import { PdfPreview } from './pdf-preview.js';
       throw new Error('Invalid resume profile: missing draftResume, basics, or work');
     }
     const styleDefaults = {
+      language: 'en',
       fontPairing: 'editorial', accentColor: '#2b6cb0', density: 'standard', margins: 'standard',
       bodyAlignment: 'justify', headerAlignment: 'left', sectionScale: {}, dateFormat: 'iso',
     };
     const nextStyle = { ...styleDefaults, ...(isLegacy ? {} : parsed.styleConfig), sectionScale: { ...(isLegacy ? {} : parsed.styleConfig?.sectionScale) } };
     if (!nextStyle
+      || !['en', 'ms'].includes(nextStyle.language)
       || !['modern', 'editorial', 'serif'].includes(nextStyle.fontPairing)
       || !['compact', 'standard', 'spacious'].includes(nextStyle.density)
       || !['tight', 'standard', 'spacious'].includes(nextStyle.margins)
@@ -2469,9 +2517,9 @@ import { PdfPreview } from './pdf-preview.js';
     };
   }
 
-  async function validateImportedProfile(profile) {
+  async function validateImportedProfile(profile, signal) {
     const res = await fetch(getApiUrl('/api/preview'), {
-      signal: AbortSignal.timeout(20_000),
+      signal: signal ?? AbortSignal.timeout(20_000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2493,21 +2541,49 @@ import { PdfPreview } from './pdf-preview.js';
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const operationId = ++activeOperationId;
+    profileAbortController?.abort();
+    const controller = new AbortController();
+    profileAbortController = controller;
+    setLibraryBusy(false);
+
+    if (activeFileReader) {
+      try { activeFileReader.abort(); } catch {}
+      activeFileReader = null;
+    }
+
     const reader = new FileReader();
+    activeFileReader = reader;
+
     reader.onload = async (event) => {
+      if (activeFileReader === reader) activeFileReader = null;
+      if (operationId !== activeOperationId) return;
       try {
         const parsed = JSON.parse(event.target.result);
         const profile = parseImportedProfile(parsed);
-        await validateImportedProfile(profile);
+        await validateImportedProfile(profile, controller.signal);
+        if (operationId !== activeOperationId) return;
         applyProfile(profile);
         savedNamedSnapshot = profileFingerprint(currentProfileBundle());
         saveStateToStorage();
         populateContentForm();
         await renderPreview();
+        if (operationId !== activeOperationId) return;
         log(`${profile.isLegacy ? 'Imported legacy resume JSON with default settings' : 'Restored complete tailored profile'} from "${file.name}".`, 'success');
       } catch (err) {
+        if (operationId !== activeOperationId) return;
         log(`Failed to import JSON: ${err.message}`, 'error');
+      } finally {
+        if (profileAbortController === controller) profileAbortController = null;
       }
+    };
+    reader.onerror = () => {
+      if (activeFileReader === reader) activeFileReader = null;
+      if (profileAbortController === controller) profileAbortController = null;
+    };
+    reader.onabort = () => {
+      if (activeFileReader === reader) activeFileReader = null;
+      if (profileAbortController === controller) profileAbortController = null;
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -2638,6 +2714,203 @@ import { PdfPreview } from './pdf-preview.js';
     if (serverBusyTimer) clearInterval(serverBusyTimer);
   });
 
+  // PDPA Dialog Controls
+  const pdpaModal = document.getElementById('modal-pdpa-notice');
+  document.getElementById('status-pdpa')?.addEventListener('click', () => {
+    pdpaModal?.showModal();
+  });
+  pdpaModal?.querySelectorAll('[data-close-pdpa]').forEach((btn) => {
+    btn.addEventListener('click', () => pdpaModal.close());
+  });
+
+  // Clear All Local Data Controls
+  const TUTORIAL_DISMISSED_KEY = 'resume_tutorial_dismissed';
+  const modalClearData = document.getElementById('modal-clear-data');
+  document.getElementById('menu-file-clear-data')?.addEventListener('click', () => {
+    closeFileMenu(true);
+    modalClearData?.showModal();
+  });
+  modalClearData?.querySelectorAll('[data-close-clear-data]').forEach((btn) => {
+    btn.addEventListener('click', () => modalClearData.close());
+  });
+  document.getElementById('btn-confirm-clear')?.addEventListener('click', async () => {
+    modalClearData?.close();
+    // 1. Invalidate all pending save/load/import/extraction operations
+    const clearOperationId = ++activeOperationId;
+    profileAbortController?.abort();
+    profileAbortController = null;
+    extractAbortController?.abort();
+    extractAbortController = null;
+    if (activeFileReader) {
+      try { activeFileReader.abort(); } catch {}
+      activeFileReader = null;
+    }
+    setLibraryBusy(false);
+
+    // 2. Cancel debounced preview work & abort in-flight preview
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (previewController) {
+      previewController.abort();
+      previewController = null;
+    }
+    invalidatePreview();
+
+    // 3. Immediately destroy the active PDF preview from DOM and memory
+    pdfPreview.destroy();
+    if (previewPages) {
+      previewPages.replaceChildren();
+      delete previewPages.dataset.pageCount;
+    }
+    if (placeholderOverlay) placeholderOverlay.style.display = 'flex';
+    setBudgetUnavailable('All local data cleared — document is blank');
+    if (statusPageCount) statusPageCount.textContent = 'Page 1/1';
+
+    // 4. Purge all 4 storage keys
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PROFILE_LIBRARY_KEY);
+    localStorage.removeItem(ASSISTANT_KEY);
+    localStorage.removeItem(TUTORIAL_DISMISSED_KEY);
+
+    // 5. Reset client state to blank
+    if (profileList) profileList.value = '';
+    if (profileName) profileName.value = '';
+    setLibraryBusy(false);
+    savedNamedSnapshot = null;
+    populateProfileLibrary('');
+
+    const blankData = structuredClone(STARTER_FIXTURES.blank);
+    pristineResume = structuredClone(blankData);
+    const profile = parseImportedProfile({
+      version: PROFILE_VERSION,
+      draftResume: blankData,
+      visibility: {},
+      styleConfig: {},
+      sectionHeadings: {},
+      sectionOrder: [...DEFAULT_SECTION_ORDER],
+      pageTarget: 1,
+      educationConfig: { ...DEFAULT_EDUCATION_CONFIG },
+    });
+    applyProfile(profile);
+    savedNamedSnapshot = profileFingerprint(currentProfileBundle());
+    populateContentForm();
+    document.querySelector('[data-tab="tab-content"]')?.click();
+
+    // 6. Report local deletion success immediately
+    setStatus('All local data cleared.', 'Ready');
+    log('All local data cleared from browser storage and memory.', 'info');
+
+    // 7. Request fresh blank preview with separate error handling
+    try {
+      await renderPreview();
+      if (clearOperationId === activeOperationId) {
+        setStatus('All local data cleared. Blank document loaded.', 'Ready');
+      }
+    } catch (err) {
+      if (clearOperationId === activeOperationId) {
+        setStatus('All local data cleared. Preview unavailable.', 'Error');
+        log(`Blank preview rendering failed: ${err.message}`, 'warn');
+      }
+    }
+  });
+
+  // Setup Wizard Controls
+  const modalTutorial = document.getElementById('modal-tutorial');
+  const chkTutorialDontShow = document.getElementById('chk-tutorial-dont-show');
+  const btnWizPrev = document.getElementById('btn-wiz-prev');
+  const btnWizNext = document.getElementById('btn-wiz-next');
+  const btnWizSkip = document.getElementById('btn-wiz-skip');
+  let currentWizardStep = 1;
+
+  function showWizardStep(step) {
+    currentWizardStep = step;
+    for (let i = 1; i <= 5; i++) {
+      const stepEl = document.getElementById(`tutorial-step-${i}`);
+      if (stepEl) stepEl.hidden = (i !== step);
+    }
+    if (btnWizPrev) btnWizPrev.disabled = (step === 1);
+    if (btnWizNext) btnWizNext.textContent = (step === 5 ? 'Finish' : 'Next');
+  }
+
+  btnWizPrev?.addEventListener('click', () => {
+    if (currentWizardStep > 1) showWizardStep(currentWizardStep - 1);
+  });
+
+  btnWizNext?.addEventListener('click', () => {
+    if (currentWizardStep < 5) {
+      showWizardStep(currentWizardStep + 1);
+    } else {
+      if (chkTutorialDontShow?.checked) {
+        localStorage.setItem(TUTORIAL_DISMISSED_KEY, 'true');
+      }
+      const selectedStarter = document.querySelector('input[name="wiz-starter"]:checked')?.value || 'blank';
+      modalTutorial?.close();
+      loadStarterArchetype(selectedStarter);
+    }
+  });
+
+  function dismissWizard() {
+    if (chkTutorialDontShow?.checked) {
+      localStorage.setItem(TUTORIAL_DISMISSED_KEY, 'true');
+    }
+    modalTutorial?.close();
+  }
+
+  btnWizSkip?.addEventListener('click', dismissWizard);
+  modalTutorial?.querySelectorAll('[data-close-tutorial]').forEach((btn) => {
+    btn.addEventListener('click', dismissWizard);
+  });
+  modalTutorial?.addEventListener('cancel', () => {
+    dismissWizard();
+  });
+
+  document.getElementById('menu-help-wizard')?.addEventListener('click', () => {
+    closeHelpMenu(true);
+    showWizardStep(1);
+    modalTutorial?.showModal();
+  });
+
+  // Mobile View Switcher Controls
+  const btnViewEditor = document.getElementById('btn-view-editor');
+  const btnViewPreview = document.getElementById('btn-view-preview');
+  const workspace = document.querySelector('.win-workspace');
+
+  function autoFitMobilePreview() {
+    if (window.innerWidth <= 768) {
+      const canvas = document.getElementById('canvas-area');
+      if (!canvas) return;
+      const padding = 24;
+      const availableWidth = canvas.clientWidth - padding;
+      const scale = Math.min(1.0, Math.max(0.25, availableWidth / 794));
+      setZoom(scale, false);
+      resizePreviewStack();
+    }
+  }
+
+  btnViewEditor?.addEventListener('click', () => {
+    workspace?.classList.remove('mobile-mode-preview');
+    btnViewEditor.classList.add('active');
+    btnViewPreview?.classList.remove('active');
+  });
+
+  btnViewPreview?.addEventListener('click', () => {
+    workspace?.classList.add('mobile-mode-preview');
+    btnViewPreview.classList.add('active');
+    btnViewEditor?.classList.remove('active');
+    autoFitMobilePreview();
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth <= 768 && workspace?.classList.contains('mobile-mode-preview')) {
+      autoFitMobilePreview();
+    }
+  });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(autoFitMobilePreview, 100);
+  });
+
   // Initial startup
   const statusHost = document.getElementById('status-host');
   if (statusHost && window.location.host) {
@@ -2647,4 +2920,12 @@ import { PdfPreview } from './pdf-preview.js';
   populateProfileLibrary();
   applyZoom();
   extractData(true);
+
+  // Wizard startup sequencing: only show if no saved draft and tutorial not dismissed
+  const hasExistingDraft = Boolean(localStorage.getItem(STORAGE_KEY));
+  const isTutorialDismissed = localStorage.getItem(TUTORIAL_DISMISSED_KEY) === 'true';
+  if (!hasExistingDraft && !isTutorialDismissed && modalTutorial) {
+    showWizardStep(1);
+    modalTutorial.showModal();
+  }
 })();

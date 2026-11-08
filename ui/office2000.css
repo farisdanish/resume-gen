@@ -974,3 +974,123 @@ html, body {
 .named-profile-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 #profile-library-message { font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
 #select-date-format, #select-page-target { display: block; width: 100%; margin-bottom: 6px; }
+
+/* Mobile View Switcher & Responsive Studio Layout */
+#mobile-view-toggle {
+  display: none;
+  margin-left: 4px;
+}
+
+#mobile-view-toggle .tool-btn.active {
+  border-top: 1px solid var(--win-dark-gray);
+  border-left: 1px solid var(--win-dark-gray);
+  border-right: 1px solid var(--win-white);
+  border-bottom: 1px solid var(--win-white);
+  background-color: #e0ded8;
+  box-shadow: inset 1px 1px 0 #000;
+  font-weight: bold;
+}
+
+@media (max-width: 1024px) {
+  .taskpane {
+    width: 320px;
+    min-width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  html, body {
+    overflow: auto;
+  }
+  .win-desktop {
+    height: auto;
+    min-height: 100vh;
+  }
+  /* Keep menubar overflow visible so File and Help dropdowns are never clipped */
+  .win-menubar {
+    height: auto;
+    min-height: 44px;
+    overflow: visible;
+    flex-wrap: nowrap;
+    padding: 2px 4px;
+    align-items: center;
+  }
+  /* Hide non-functional decorative items on mobile */
+  #menu-edit, #menu-view, #menu-insert, #menu-format, 
+  #menu-tools, #menu-table, #menu-window {
+    display: none;
+  }
+  /* Toolbar scrolls horizontally for action buttons and selects with adequate height for 40px touch targets */
+  .win-toolbar {
+    height: auto;
+    min-height: 48px;
+    padding: 4px 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+  }
+  .win-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  #mobile-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .win-workspace {
+    flex-direction: column;
+    height: calc(100vh - 140px);
+  }
+  .taskpane {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    display: flex;
+  }
+  .document-canvas {
+    width: 100% !important;
+    display: none;
+    padding: 8px 4px;
+  }
+  .mobile-mode-preview .taskpane {
+    display: none;
+  }
+  .mobile-mode-preview .document-canvas {
+    display: flex;
+  }
+  /* Dialog responsiveness */
+  .help-dialog {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 88vh !important;
+    margin: auto;
+    overflow-y: auto;
+  }
+  /* Touch target standard: >= 40px */
+  .tool-btn, .win-button, .taskpane-tab-btn, .menu-item {
+    height: 42px;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 8px 12px;
+  }
+  .tool-select {
+    height: 40px;
+    min-height: 40px;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 4px 6px;
+  }
+  .tool-handle, .tool-sep {
+    height: 32px;
+  }
+  .status-cell-optional {
+    display: none;
+  }
+}
+
