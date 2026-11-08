@@ -1003,11 +1003,22 @@ html, body {
 
 @media (max-width: 768px) {
   html, body {
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
   }
   .win-desktop {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     height: auto;
     min-height: 100vh;
+  }
+  .win-statusbar {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
   }
   /* Keep menubar overflow visible so File and Help dropdowns are never clipped */
   .win-menubar {

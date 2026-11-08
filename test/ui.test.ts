@@ -993,10 +993,18 @@ describe('Editor preview and budget flow', () => {
       expect(previewBox).not.toBeNull();
       expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(375);
 
+      // Verify zero page-level horizontal overflow in preview mode
+      const previewBodyOverflow = await page.evaluate(() => document.body.scrollWidth > document.documentElement.clientWidth);
+      expect(previewBodyOverflow).toBe(false);
+
       // Switch back to Editor
       await page.locator('#btn-view-editor').click();
       expect(await taskpane.isVisible()).toBe(true);
       expect(await canvas.isVisible()).toBe(false);
+
+      // Verify zero page-level horizontal overflow in editor mode
+      const editorBodyOverflow = await page.evaluate(() => document.body.scrollWidth > document.documentElement.clientWidth);
+      expect(editorBodyOverflow).toBe(false);
     } finally {
       await page.close();
     }
