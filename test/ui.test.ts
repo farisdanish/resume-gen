@@ -973,10 +973,25 @@ describe('Editor preview and budget flow', () => {
       expect(minWidth).toBe('0px');
 
       // Check mobile toolbar touch bounds: height must accommodate 40px touch targets without clipping
-      const toolbarHeight = await page.locator('.win-toolbar').first().evaluate((el) => el.clientHeight);
+      const toolbarHeight = await page.locator('#toolbar-standard').evaluate((el) => el.clientHeight);
       expect(toolbarHeight).toBeGreaterThanOrEqual(44);
-      const buttonHeight = await page.locator('.win-toolbar .tool-btn').first().evaluate((el) => el.clientHeight);
+      const buttonHeight = await page.locator('#btn-view-editor').evaluate((el) => el.clientHeight);
       expect(buttonHeight).toBeGreaterThanOrEqual(40);
+
+      // Verify formatting toolbar is suppressed on mobile
+      expect(await page.locator('#toolbar-formatting').isVisible()).toBe(false);
+
+      // Verify confusing duplicate preview button is suppressed on mobile
+      expect(await page.locator('#tb-preview').isVisible()).toBe(false);
+
+      // Verify zero horizontal toolbar overflow (no scrolling needed to find buttons)
+      const isOverflowing = await page.locator('#toolbar-standard').evaluate((el) => el.scrollWidth > el.clientWidth + 2);
+      expect(isOverflowing).toBe(false);
+
+      // Verify switcher buttons are immediately visible without horizontal scrolling
+      const previewBox = await page.locator('#btn-view-preview').boundingBox();
+      expect(previewBox).not.toBeNull();
+      expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(375);
 
       // Switch back to Editor
       await page.locator('#btn-view-editor').click();

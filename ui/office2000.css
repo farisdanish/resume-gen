@@ -280,6 +280,9 @@ html, body {
   color: #000;
   cursor: pointer;
 }
+.btn-label-mobile {
+  display: none;
+}
 
 .tool-btn:hover {
   background-color: var(--win-gray);
@@ -1012,36 +1015,79 @@ html, body {
     min-height: 44px;
     overflow: visible;
     flex-wrap: nowrap;
-    padding: 2px 4px;
+    padding: 4px 6px;
     align-items: center;
+    gap: 6px;
   }
   /* Hide non-functional decorative items on mobile */
   #menu-edit, #menu-view, #menu-insert, #menu-format, 
   #menu-tools, #menu-table, #menu-window {
     display: none;
   }
-  /* Toolbar scrolls horizontally for action buttons and selects with adequate height for 40px touch targets */
-  .win-toolbar {
+  /* Hide inert secondary formatting toolbar on mobile */
+  #toolbar-formatting {
+    display: none !important;
+  }
+  /* Hide inert/confusing items from standard toolbar on mobile */
+  #toolbar-standard .tool-handle,
+  #toolbar-standard .tool-sep,
+  #tb-new, #tb-open, #tb-save,
+  #tb-cut, #tb-copy, #tb-undo, #tb-redo,
+  #tb-preview,
+  #zoom-select,
+  label[for="zoom-select"] {
+    display: none !important;
+  }
+  /* Zero-scroll single-row mobile control bar */
+  #toolbar-standard {
     height: auto;
     min-height: 48px;
     padding: 4px 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    display: flex;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    display: flex !important;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
     box-sizing: border-box;
-  }
-  .win-toolbar::-webkit-scrollbar {
-    display: none;
+    width: 100%;
+    white-space: normal;
   }
   #mobile-view-toggle {
-    display: inline-flex;
+    display: flex;
+    flex: 1 1 auto;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
+    margin-left: 0;
+  }
+  #mobile-view-toggle .tool-btn {
+    flex: 1 1 50%;
+    justify-content: center;
+    font-weight: bold;
+    height: 42px;
+    min-height: 42px;
+  }
+  #tb-print {
+    display: inline-flex !important;
+    flex: 0 0 auto;
+    height: 42px;
+    min-height: 42px;
+    padding: 0 10px;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn-label-desktop {
+    display: none;
+  }
+  .btn-label-mobile {
+    display: inline;
+  }
+  .help-dropdown [role="menuitem"], .file-dropdown [role="menuitem"] {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
   }
   .win-workspace {
     flex-direction: column;

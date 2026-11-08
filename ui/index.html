@@ -61,8 +61,12 @@
     </nav>
 
     <!-- 3. Standard Toolbar -->
-    <div class="win-toolbar">
+    <div class="win-toolbar" id="toolbar-standard">
       <div class="tool-handle"></div>
+      <div id="mobile-view-toggle">
+        <button type="button" class="tool-btn active" id="btn-view-editor" title="Editor View">📝 Edit</button>
+        <button type="button" class="tool-btn" id="btn-view-preview" title="Preview View">📄 Preview</button>
+      </div>
       <button class="tool-btn" id="tb-new" title="New Document">
         <span class="btn-icon">📄</span>
       </button>
@@ -75,7 +79,8 @@
       <div class="tool-sep"></div>
       <button class="tool-btn" id="tb-print" title="Export PDF">
         <span class="btn-icon">🖨️</span>
-        <span>Export PDF</span>
+        <span class="btn-label-desktop">Export PDF</span>
+        <span class="btn-label-mobile">PDF</span>
       </button>
       <button class="tool-btn" id="tb-preview" title="Refresh Live Preview">
         <span class="btn-icon">🔍</span>
@@ -97,15 +102,10 @@
         <option value="2.0">200%</option>
         <option value="fit">Fit Page</option>
       </select>
-      <div class="tool-sep" id="mobile-view-sep" style="display: none;"></div>
-      <div id="mobile-view-toggle">
-        <button type="button" class="tool-btn active" id="btn-view-editor" title="Editor View">📝 Edit</button>
-        <button type="button" class="tool-btn" id="btn-view-preview" title="Preview View">📄 Preview</button>
-      </div>
     </div>
 
     <!-- 4. Formatting Toolbar -->
-    <div class="win-toolbar" style="height: 26px; border-top: none;">
+    <div class="win-toolbar" id="toolbar-formatting" style="height: 26px; border-top: none;">
       <div class="tool-handle"></div>
       <select class="tool-select" style="width: 130px;" disabled>
         <option id="toolbar-font-name">Carlito</option>
