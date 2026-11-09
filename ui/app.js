@@ -1912,6 +1912,7 @@ import { PdfPreview } from './pdf-preview.js';
       }
       if (!res.ok || !result.success) {
         setBudgetUnavailable('Budget unavailable — previous preview is out of date');
+        console.error('Rendering failed:', result.error, result.issues || []);
         log(`Rendering failed: ${result.error}`, 'error');
         if (result.issues) {
           result.issues.forEach((i) => log(`[Validation] ${i.path.join('.')}: ${i.message}`, 'warn'));
@@ -1936,6 +1937,7 @@ import { PdfPreview } from './pdf-preview.js';
     } catch (err) {
       if (revision !== previewRevision) return;
       setBudgetUnavailable('Budget unavailable — previous preview is out of date');
+      console.error('Preview error:', err);
       log(`Preview error: ${err.message}`, 'error');
       setStatus('Preview failed', 'Error');
     } finally {

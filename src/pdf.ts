@@ -16,9 +16,9 @@ export function isChromiumSandboxEnabled(): boolean {
   return process.env.DISABLE_CHROMIUM_SANDBOX !== 'true';
 }
 
-export function getChromiumLaunchArgs(): string[] {
+export function getChromiumLaunchArgs(sandboxEnabled = isChromiumSandboxEnabled()): string[] {
   const args = ['--disable-dev-shm-usage'];
-  if (!isChromiumSandboxEnabled()) {
+  if (!sandboxEnabled) {
     args.push('--no-sandbox', '--disable-setuid-sandbox');
   }
   return args;
@@ -36,15 +36,35 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
     }, 15_000);
   });
   const operation = (async () => {
-    browser = await chromium.launch({
-      headless: true,
-      chromiumSandbox: isChromiumSandboxEnabled(),
-      handleSIGINT: false,
-      handleSIGTERM: false,
-      handleSIGHUP: false,
-      timeout: 15_000,
-      args: getChromiumLaunchArgs(),
-    });
+    const launchBrowser = async () => {
+      const sandboxEnabled = isChromiumSandboxEnabled();
+      try {
+        return await chromium.launch({
+          headless: true,
+          chromiumSandbox: sandboxEnabled,
+          handleSIGINT: false,
+          handleSIGTERM: false,
+          handleSIGHUP: false,
+          timeout: 15_000,
+          args: getChromiumLaunchArgs(sandboxEnabled),
+        });
+      } catch (launchErr: any) {
+        if (sandboxEnabled) {
+          console.warn('[PDF] Chromium launch with OS sandboxing failed; falling back to un-sandboxed mode:', launchErr?.message);
+          return await chromium.launch({
+            headless: true,
+            chromiumSandbox: false,
+            handleSIGINT: false,
+            handleSIGTERM: false,
+            handleSIGHUP: false,
+            timeout: 15_000,
+            args: getChromiumLaunchArgs(false),
+          });
+        }
+        throw launchErr;
+      }
+    };
+    browser = await launchBrowser();
     try {
       if (expired) throw new Error('PDF layout measurement timed out');
       const page = await browser.newPage();

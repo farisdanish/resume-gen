@@ -400,6 +400,7 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   gap: 8px;
 }
 
@@ -407,6 +408,8 @@ html, body {
   display: none;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tab-pane.active {
@@ -717,6 +720,9 @@ html, body {
   border-top: 1px solid var(--win-dark-gray);
   box-shadow: 1px 1px 0 #fff;
   background: var(--win-gray);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .win-legend {
@@ -827,12 +833,18 @@ html, body {
   font-size: 10px;
   max-height: 120px;
   overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   user-select: text;
 }
 
 .log-item {
   line-height: 1.4;
   margin-bottom: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 .log-info { color: #004080; }
 .log-warn { color: #8a6d3b; font-weight: bold; }

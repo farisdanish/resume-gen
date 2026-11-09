@@ -20,7 +20,14 @@ import { generatePdf } from './pdf';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.resolve(__dirname, '../ui');
-const PDFJS_PATH = fileURLToPath(import.meta.resolve('unpdf/pdfjs'));
+let PDFJS_PATH = path.resolve(__dirname, '../node_modules/unpdf/dist/pdfjs.mjs');
+try {
+  if (typeof import.meta.resolve === 'function') {
+    PDFJS_PATH = fileURLToPath(import.meta.resolve('unpdf/pdfjs'));
+  }
+} catch {
+  // Use resolved node_modules path fallback
+}
 
 export function formatPdfFilename(resume: any): string {
   const name = String(resume?.basics?.name || 'RESUME')
@@ -336,7 +343,10 @@ app.post('/api/preview', async (c) => {
   }
 
   try {
-    const body = await c.req.json();
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return c.json({ success: false, error: 'Invalid or missing JSON payload' }, 400);
+    }
     const targetValidation = PageTargetSchema.safeParse(body.pageTarget);
     if (!targetValidation.success) return c.json({ success: false, error: 'Invalid page target', issues: targetValidation.error.issues }, 400);
     const pageTarget = targetValidation.data;
@@ -391,7 +401,8 @@ app.post('/api/preview', async (c) => {
       budget: { fullnessPercent: layout.fullnessPercent, pageCount, isSinglePage, pageTarget, withinTarget: pageCount <= pageTarget, targetFullnessPercent: layout.fullnessPercent / pageTarget },
     });
   } catch (err: any) {
-    const status = err.status || 500;
+    console.error('[API Preview Error]', err);
+    const status = err.status || (err.message?.includes('timed out') ? 503 : 500);
     if (status === 503 || status === 429) {
       return c.json(
         { success: false, error: err.message || 'Server busy: PDF generation queue at capacity', retryAfter: 5 },
@@ -418,7 +429,10 @@ app.post('/api/generate-pdf', async (c) => {
   }
 
   try {
-    const body = await c.req.json();
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return c.json({ success: false, error: 'Invalid or missing JSON payload' }, 400);
+    }
     const targetValidation = PageTargetSchema.safeParse(body.pageTarget);
     if (!targetValidation.success) return c.json({ success: false, error: 'Invalid page target', issues: targetValidation.error.issues }, 400);
     const pageTarget = targetValidation.data;
@@ -489,7 +503,8 @@ app.post('/api/generate-pdf', async (c) => {
       'X-Within-Target': String(pageCount <= pageTarget),
     });
   } catch (err: any) {
-    const status = err.status || 500;
+    console.error('[API Generate PDF Error]', err);
+    const status = err.status || (err.message?.includes('timed out') ? 503 : 500);
     if (status === 503 || status === 429) {
       return c.json(
         { success: false, error: err.message || 'Server busy: PDF generation queue at capacity', retryAfter: 5 },
