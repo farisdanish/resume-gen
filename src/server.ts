@@ -43,7 +43,7 @@ export class ConcurrencyLimiter {
 
   constructor(
     public readonly maxConcurrent: number = 2,
-    public readonly queueTimeoutMs: number = 5000
+    public queueTimeoutMs: number = 5000
   ) {}
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
@@ -131,7 +131,30 @@ export const pdfConcurrencyLimiter = new ConcurrencyLimiter(
 export const pdfRateLimiter = new SlidingWindowRateLimiter(10, 60_000);
 export const previewRateLimiter = new SlidingWindowRateLimiter(60, 60_000);
 
+export let isShuttingDown = false;
+let isDraining = false;
+let inFlightRequests = 0;
+
+export function getInFlightRequests(): number {
+  return inFlightRequests;
+}
+
+export function setShuttingDown(val: boolean) {
+  isShuttingDown = val;
+  if (!val) isDraining = false;
+}
+
 export const app = new Hono();
+
+// Track in-flight HTTP requests for graceful shutdown draining
+app.use('/*', async (c, next) => {
+  inFlightRequests++;
+  try {
+    await next();
+  } finally {
+    inFlightRequests--;
+  }
+});
 
 export const recentServerLogs: Array<{
   requestId: string;
@@ -190,6 +213,16 @@ app.use('/*', async (c, next) => {
   }
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204);
+  }
+  await next();
+});
+
+// Early shutdown guard middleware
+app.use('/api/*', async (c, next) => {
+  if (isShuttingDown) {
+    return c.json({ success: false, error: 'Server is shutting down' }, 503, {
+      'Retry-After': '10',
+    });
   }
   await next();
 });
@@ -510,11 +543,69 @@ app.get('/', (c) => {
   return c.text('Office 2000 UI index not found', 404);
 });
 
+export async function gracefulShutdown(
+  server: any,
+  signal: string,
+  timeoutMs: number = 10000
+): Promise<void> {
+  if (isDraining) return;
+  isDraining = true;
+  setShuttingDown(true);
+  console.log(`Received ${signal}. Draining active jobs before shutdown...`);
+
+  // Close idle keep-alive connections immediately so they don't linger
+  if (server && typeof server.closeIdleConnections === 'function') {
+    server.closeIdleConnections();
+  }
+
+  // Stop accepting new connections on the underlying HTTP server
+  let closePromise: Promise<void> | undefined;
+  if (server && typeof server.close === 'function') {
+    closePromise = new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  }
+
+  const start = Date.now();
+  // Await completion of both active PDF workers and in-flight HTTP requests
+  while (
+    (pdfConcurrencyLimiter.getActiveCount() > 0 || inFlightRequests > 0) &&
+    Date.now() - start < timeoutMs
+  ) {
+    if (server && typeof server.closeIdleConnections === 'function') {
+      server.closeIdleConnections();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  // Final sweep of idle connections to allow the server close callback to fire
+  if (server && typeof server.closeIdleConnections === 'function') {
+    server.closeIdleConnections();
+  }
+
+  if (closePromise) {
+    const remainingTime = Math.max(500, timeoutMs - (Date.now() - start));
+    await Promise.race([
+      closePromise,
+      new Promise((resolve) => setTimeout(resolve, remainingTime)),
+    ]);
+  }
+
+  console.log(
+    `Draining complete. Active PDF jobs: ${pdfConcurrencyLimiter.getActiveCount()}, in-flight HTTP: ${inFlightRequests}`
+  );
+  if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
+    process.exit(0);
+  }
+}
+
 export function startServer(
-  port = Number(process.env.PORT) || 3000,
+  port = process.env.PORT !== undefined ? Number(process.env.PORT) : 3000,
   hostname = process.env.HOST || '127.0.0.1'
 ) {
-  return serve(
+  const server = serve(
     {
       fetch: app.fetch,
       port,
@@ -524,6 +615,25 @@ export function startServer(
       console.log(`Resume-gen server running strictly on http://${info.address}:${info.port}`);
     }
   );
+
+  const shutdownHandler = (signal: string) => {
+    void gracefulShutdown(server, signal);
+  };
+
+  const onSigTerm = () => shutdownHandler('SIGTERM');
+  const onSigInt = () => shutdownHandler('SIGINT');
+
+  process.once('SIGTERM', onSigTerm);
+  process.once('SIGINT', onSigInt);
+
+  if (server && typeof server.on === 'function') {
+    server.on('close', () => {
+      process.removeListener('SIGTERM', onSigTerm);
+      process.removeListener('SIGINT', onSigInt);
+    });
+  }
+
+  return server;
 }
 
 const isDirectRun =

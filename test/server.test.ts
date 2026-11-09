@@ -1,6 +1,16 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { execSync } from 'node:child_process';
-import { startServer, getSafeRouteIdentifier, recentServerLogs } from '../src/server';
+import { execSync, spawn } from 'node:child_process';
+import {
+  startServer,
+  getSafeRouteIdentifier,
+  recentServerLogs,
+  pdfConcurrencyLimiter,
+  ConcurrencyLimiter,
+  isShuttingDown,
+  setShuttingDown,
+  gracefulShutdown,
+  getInFlightRequests,
+} from '../src/server';
 import type { Server } from 'node:http';
 import resumeFixture from '../fixtures/resume.json';
 import { PDFDocument } from 'pdf-lib';
@@ -516,5 +526,259 @@ describe('Server & Loopback Security Test', () => {
 
     const leakedLog = recentServerLogs.find((l) => l.path.includes('private-candidate@example.com'));
     expect(leakedLog).toBeUndefined();
+  });
+
+  // --- Milestone 6: Concurrency Load & Graceful Draining Tests ---
+
+  test('Multi-user parallel burst load respects concurrency ceiling (max 2 active jobs)', async () => {
+    let peakActive = 0;
+    const interval = setInterval(() => {
+      const active = pdfConcurrencyLimiter.getActiveCount();
+      if (active > peakActive) {
+        peakActive = active;
+      }
+    }, 10);
+
+    try {
+      const requests = Array.from({ length: 6 }, (_, i) =>
+        fetch(`${BASE_URL}/api/generate-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume: {
+              ...resumeFixture,
+              basics: { ...resumeFixture.basics, name: `User Load ${i}` },
+            },
+          }),
+        })
+      );
+
+      const responses = await Promise.all(requests);
+      for (const res of responses) {
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('application/pdf');
+      }
+
+      // Assert that active workers never exceeded max concurrency ceiling (2)
+      expect(peakActive).toBeLessThanOrEqual(2);
+      expect(pdfConcurrencyLimiter.getActiveCount()).toBe(0);
+      expect(pdfConcurrencyLimiter.getQueueLength()).toBe(0);
+    } finally {
+      clearInterval(interval);
+    }
+  }, 45000);
+
+  test('ConcurrencyLimiter: Throws 503 error when queue timeout threshold is exceeded', async () => {
+    const limiter = new ConcurrencyLimiter(1, 150); // max 1 job, 150ms timeout
+    let job1Finished = false;
+
+    // Job 1: Takes 300ms
+    const job1 = limiter.run(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+      job1Finished = true;
+      return 'job1-done';
+    });
+
+    // Job 2: Queued behind Job 1, timeout is 150ms so it should reject with status 503
+    const job2 = limiter.run(async () => {
+      return 'job2-done';
+    });
+
+    await expect(job2).rejects.toMatchObject({
+      message: expect.stringContaining('Server busy: PDF generation queue timeout'),
+      status: 503,
+    });
+
+    expect(await job1).toBe('job1-done');
+    expect(job1Finished).toBe(true);
+    expect(limiter.getActiveCount()).toBe(0);
+  });
+
+  test('ConcurrencyLimiter HTTP Backpressure: returns 503 and Retry-After header on queue timeout', async () => {
+    const originalTimeout = pdfConcurrencyLimiter.queueTimeoutMs;
+    // Set a tight queue timeout for backpressure testing
+    pdfConcurrencyLimiter.queueTimeoutMs = 120;
+
+    let releaseSlot1: () => void;
+    let releaseSlot2: () => void;
+    const slot1Promise = new Promise<void>((resolve) => {
+      releaseSlot1 = resolve;
+    });
+    const slot2Promise = new Promise<void>((resolve) => {
+      releaseSlot2 = resolve;
+    });
+
+    // Saturate the concurrency limiter (max 2 jobs)
+    const worker1 = pdfConcurrencyLimiter.run(async () => {
+      await slot1Promise;
+      return 'done1';
+    });
+    const worker2 = pdfConcurrencyLimiter.run(async () => {
+      await slot2Promise;
+      return 'done2';
+    });
+
+    try {
+      // Third request is queued behind the two active jobs and exceeds the 120ms timeout
+      const res = await fetch(`${BASE_URL}/api/generate-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume: resumeFixture }),
+      });
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get('retry-after')).toBe('5');
+      const body = await res.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('PDF generation queue timeout');
+      expect(body.retryAfter).toBe(5);
+    } finally {
+      // Release workers and restore default timeout
+      releaseSlot1!();
+      releaseSlot2!();
+      await Promise.all([worker1, worker2]);
+      pdfConcurrencyLimiter.queueTimeoutMs = originalTimeout;
+    }
+  });
+
+  test('Graceful Process Draining: in-flight accepted PDF generation request completes with HTTP 200 during shutdown', async () => {
+    // Start an isolated server on an ephemeral port
+    const drainServer = startServer(0, '127.0.0.1');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const drainPort = (drainServer.address() as any).port;
+    const drainUrl = `http://127.0.0.1:${drainPort}`;
+
+    try {
+      // Dispatch an accepted PDF generation request
+      const inFlightPromise = fetch(`${drainUrl}/api/generate-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume: resumeFixture }),
+      });
+
+      // Allow request to be received, parsed, and enter processing
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      // Trigger graceful shutdown while the request is in flight
+      const shutdownPromise = gracefulShutdown(drainServer, 'SIGTERM', 15000);
+
+      // Verify that new incoming requests arriving after shutdown begins are rejected with 503
+      const healthRes = await fetch(`${BASE_URL}/api/health`);
+      expect(healthRes.status).toBe(503);
+
+      const inFlightRes = await inFlightPromise;
+      expect(inFlightRes.status).toBe(200);
+      expect(inFlightRes.headers.get('content-type')).toBe('application/pdf');
+      const pdfBytes = await inFlightRes.arrayBuffer();
+      expect(pdfBytes.byteLength).toBeGreaterThan(1000);
+
+      await shutdownPromise;
+      expect(getInFlightRequests()).toBe(0);
+      expect(pdfConcurrencyLimiter.getActiveCount()).toBe(0);
+    } finally {
+      setShuttingDown(false);
+      if (typeof drainServer.close === 'function') {
+        await new Promise<void>((resolve) => drainServer.close(() => resolve()));
+      }
+    }
+  }, 30000);
+
+  test.each(['SIGTERM', 'SIGINT'] as const)(
+    'Graceful Process Draining: Child server completes in-flight PDF request when receiving %s',
+    async (signal) => {
+      const child = spawn('npx', ['tsx', 'src/server.ts'], {
+        env: { ...process.env, PORT: '0', NODE_ENV: 'production' },
+      });
+
+      try {
+        const port = await new Promise<number>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Child server startup timed out')), 10000);
+          child.stdout.on('data', (data) => {
+            const line = data.toString();
+            const match = line.match(/http:\/\/127\.0\.0\.1:(\d+)/);
+            if (match) {
+              clearTimeout(timeout);
+              resolve(Number(match[1]));
+            }
+          });
+          child.on('error', (err) => {
+            clearTimeout(timeout);
+            reject(err);
+          });
+        });
+
+        // Dispatch a real PDF generation request
+        const reqPromise = fetch(`http://127.0.0.1:${port}/api/generate-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume: resumeFixture }),
+        });
+
+        // Wait 250ms so Chromium is actively launched and rendering
+        await new Promise((r) => setTimeout(r, 250));
+
+        // Send signal to the child server process
+        child.kill(signal);
+
+        const res = await reqPromise;
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('application/pdf');
+        const pdfBytes = await res.arrayBuffer();
+        expect(pdfBytes.byteLength).toBeGreaterThan(1000);
+
+        // Await child process exit code 0
+        const exitCode = await new Promise<number | null>((resolve) => {
+          child.on('exit', (code) => resolve(code));
+        });
+        expect(exitCode).toBe(0);
+      } finally {
+        if (!child.killed) {
+          child.kill('SIGKILL');
+        }
+      }
+    },
+    30000
+  );
+
+  test('Graceful Process Draining: Rejects incoming API calls with 503 when shutting down and drains cleanly', async () => {
+    expect(isShuttingDown).toBe(false);
+
+    try {
+      // Initiate shutdown state
+      setShuttingDown(true);
+
+      const healthRes = await fetch(`${BASE_URL}/api/health`);
+      expect(healthRes.status).toBe(503);
+      const json = await healthRes.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Server is shutting down');
+      expect(healthRes.headers.get('retry-after')).toBe('10');
+
+      const previewRes = await fetch(`${BASE_URL}/api/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume: resumeFixture }),
+      });
+      expect(previewRes.status).toBe(503);
+
+      // Verify gracefulShutdown function drains properly without error
+      let closed = false;
+      const mockServer = {
+        close: () => {
+          closed = true;
+        },
+      };
+
+      await gracefulShutdown(mockServer, 'SIGTERM', 2000);
+      expect(closed).toBe(true);
+      expect(pdfConcurrencyLimiter.getActiveCount()).toBe(0);
+    } finally {
+      // Restore clean running state
+      setShuttingDown(false);
+    }
+
+    // Verify recovery after restoring state
+    const recoveryRes = await fetch(`${BASE_URL}/api/health`);
+    expect(recoveryRes.status).toBe(200);
   });
 });

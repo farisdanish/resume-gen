@@ -676,6 +676,7 @@ describe('Editor preview and budget flow', () => {
       expect(await about.isVisible()).toBe(false);
       expect(await help.evaluate((el) => document.activeElement === el)).toBe(true);
       await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(50);
       await page.keyboard.press('ArrowDown');
       expect(await page.getByRole('menuitem', { name: 'Report an Issue…' }).evaluate((el) => document.activeElement === el)).toBe(true);
       await page.keyboard.press('Home');

@@ -12,6 +12,18 @@ export interface PdfResult {
   };
 }
 
+export function isChromiumSandboxEnabled(): boolean {
+  return process.env.DISABLE_CHROMIUM_SANDBOX !== 'true';
+}
+
+export function getChromiumLaunchArgs(): string[] {
+  const args = ['--disable-dev-shm-usage'];
+  if (!isChromiumSandboxEnabled()) {
+    args.push('--no-sandbox', '--disable-setuid-sandbox');
+  }
+  return args;
+}
+
 export async function generatePdf({ html }: { html: string }): Promise<PdfResult> {
   let browser: Browser | undefined;
   let expired = false;
@@ -26,8 +38,12 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
   const operation = (async () => {
     browser = await chromium.launch({
       headless: true,
+      chromiumSandbox: isChromiumSandboxEnabled(),
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
       timeout: 15_000,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: getChromiumLaunchArgs(),
     });
     try {
       if (expired) throw new Error('PDF layout measurement timed out');
@@ -62,7 +78,13 @@ export async function generatePdf({ html }: { html: string }): Promise<PdfResult
         let printMargins = 0;
         {
           // Resolve repeated @page margins in physical units through the layout engine.
-          const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules));
+          const rules = Array.from(document.styleSheets).flatMap((sheet) => {
+            try {
+              return Array.from(sheet.cssRules);
+            } catch {
+              return [];
+            }
+          });
           const pageRule = rules.filter((rule): rule is CSSPageRule => rule instanceof CSSPageRule).at(-1);
           const measure = document.createElement('div');
           measure.style.position = 'absolute';
